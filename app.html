@@ -44,6 +44,11 @@
   --ok-claro:#6EE7A0; --erro-claro:#FF9AA5; --ouro-escuro:#E8B84B;
   --selecionado-bg:#FF1B4C; --selecionado-txt:#FFFFFF;
   --aba-ativa-bg:rgba(255,27,76,0.16); --aba-ativa-txt:#FF5C7C;
+  /* Cores de GRAFICO. Separadas das cores de interface de proposito:
+     estas passaram no teste de daltonismo e de contraste contra o
+     fundo escuro (protan/deutan/tritan). Nao trocar sem revalidar. */
+  --serie-saiu:#FF1B4C; --serie-entrou:#2B8FEE;
+  --grade-eixo:#2A2E3B; --grade-texto:#98A0B0;
 }
   body { margin: 0; font-family: 'Inter', sans-serif; background: var(--fundo); color: var(--texto); }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -108,7 +113,16 @@
       --ok-claro:#1F4A31; --erro-claro:#7A1F16; --ouro-escuro:#6B4310;
       --selecionado-bg:#E7E2D6; --selecionado-txt:#14120D;
       --aba-ativa-bg:#FFFFFF; --aba-ativa-txt:#14120D;
+      /* No papel as mesmas duas series precisam de outros passos:
+         revalidados contra o branco. */
+      --serie-saiu:#A8342A; --serie-entrou:#2E6BB0;
+      --grade-eixo:#B8B2A3; --grade-texto:#403C33;
     }
+    /* barra clara em papel branco some; o contorno segura a forma.
+       A barra de categoria e uma div (borda) e a do grafico de meses
+       e um <rect> (stroke) — precisam dos dois. */
+    div.barra-dado { border: .75px solid #14120D !important; box-sizing: border-box !important; }
+    rect.barra-dado { stroke: #14120D !important; stroke-width: .75px !important; }
     body { background: #FFFFFF !important; color: #14120D !important; }
     .text-white { color: #14120D !important; }
   }
@@ -125,7 +139,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
    Painel de Bordo: carregador + app.html, auto-atualizacao,
    Dropbox por PKCE e leitura de documento por IA.
 =========================================================== */
-const APP_VERSION = "v2";
+const APP_VERSION = "v5";
 const NOME_APP = "Prumo";
 
 /* ===========================================================
@@ -265,6 +279,127 @@ function lsSet(key, value) {
 
 
 /* ===========================================================
+   ICONES DE CATEGORIA
+   Cor sozinha e a pior forma de identidade: some no daltonismo,
+   some na impressao em preto e branco e some na miniatura. Cada
+   categoria carrega um desenho proprio, e o nome escrito ao lado.
+   Todos no mesmo tracado dos outros icones do app: 24x24, linha.
+=========================================================== */
+const IC = {
+  mercado:      (p) => <Icon {...p}><path d="M2 3h2.2l2.3 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.5L20 7H5.4"/><circle cx="9.5" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></Icon>,
+  combustivel:  (p) => <Icon {...p}><path d="M4 21V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15"/><path d="M4 12h8"/><path d="M14 9l3 3v6a1.5 1.5 0 0 0 3 0v-6l-2-3"/><path d="M2 21h14"/></Icon>,
+  saude:        (p) => <Icon {...p}><path d="M20.8 6.6a5 5 0 0 0-7.1 0L12 8.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 22l8.8-8.3a5 5 0 0 0 0-7.1z"/><path d="M12 11v4M10 13h4"/></Icon>,
+  casa:         (p) => <Icon {...p}><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></Icon>,
+  contas:       (p) => <Icon {...p}><path d="M13 2L4.5 13H11l-1 9 8.5-11H12z"/></Icon>,
+  educacao:     (p) => <Icon {...p}><path d="M12 3L1.5 8.2 12 13.4l10.5-5.2z"/><path d="M5.5 10.5v5.2c0 1.7 2.9 3.1 6.5 3.1s6.5-1.4 6.5-3.1v-5.2"/><path d="M22.5 8.2v6"/></Icon>,
+  transporte:   (p) => <Icon {...p}><path d="M4 16V9.5l1.6-4A2 2 0 0 1 7.5 4h9a2 2 0 0 1 1.9 1.5L20 9.5V16"/><path d="M2 16h20"/><path d="M4 16v2.5M20 16v2.5"/><circle cx="7.5" cy="12.5" r="1.2"/><circle cx="16.5" cy="12.5" r="1.2"/></Icon>,
+  restaurante:  (p) => <Icon {...p}><path d="M6 2v8a2.5 2.5 0 0 0 5 0V2"/><path d="M8.5 10v12"/><path d="M6 2v5M11 2v5"/><path d="M18 2c-1.6 1.4-2.5 3.4-2.5 5.6 0 1.7.9 2.9 2.5 3.2V22"/></Icon>,
+  lazer:        (p) => <Icon {...p}><path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></Icon>,
+  vestuario:    (p) => <Icon {...p}><path d="M9 3l3 2.2L15 3l5.5 3.2-2.2 3.8-2-1V21H7.7V9L5.7 10 3.5 6.2z"/></Icon>,
+  pets:         (p) => <Icon {...p}><ellipse cx="6" cy="10" rx="1.9" ry="2.5"/><ellipse cx="10.5" cy="6.5" rx="1.9" ry="2.5"/><ellipse cx="15.5" cy="6.5" rx="1.9" ry="2.5"/><ellipse cx="19" cy="11" rx="1.9" ry="2.5"/><path d="M12.5 13c-2.6 0-5 2.2-5 4.6 0 1.7 1.3 2.7 3 2.7 1.1 0 1.6-.5 2.6-.5s1.5.5 2.6.5c1.7 0 3-1 3-2.7 0-2.4-2.4-4.6-5-4.6z"/></Icon>,
+  financiamento:(p) => <Icon {...p}><path d="M3 10l9-6 9 6"/><path d="M5 10v9M19 10v9M9.5 10v9M14.5 10v9M3 21h18"/><path d="M15.5 5.5l4.5 3"/></Icon>,
+  imposto:      (p) => <Icon {...p}><path d="M5 21V4a1 1 0 0 1 1.5-.9L9 4.4l2.5-1.4L14 4.4l2.5-1.4L19 4.4V21l-2.5-1.4L14 21l-2.5-1.4L9 21z"/><path d="M9 9h6M9 13h6"/></Icon>,
+  outros:       (p) => <Icon {...p}><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></Icon>,
+  presente:     (p) => <Icon {...p}><rect x="3" y="9" width="18" height="12" rx="1.5"/><path d="M3 13h18M12 9v12"/><path d="M12 9S9.5 3 7 3a2.4 2.4 0 0 0 0 4.8h10a2.4 2.4 0 0 0 0-4.8c-2.5 0-5 6-5 6z"/></Icon>,
+  viagem:       (p) => <Icon {...p}><path d="M2 15.5l3-1 4.5 1.6 3-1.1-6-6.6 2.4-.9 7.4 4.7 4.2-1.5a2 2 0 0 1 1.3 3.8L4.5 20z"/></Icon>,
+  telefone:     (p) => <Icon {...p}><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18.5h2"/></Icon>,
+  internet:     (p) => <Icon {...p}><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></Icon>,
+  academia:     (p) => <Icon {...p}><path d="M2.5 9.5v5M5.5 7v10M18.5 7v10M21.5 9.5v5"/><path d="M5.5 12h13"/></Icon>,
+  seguro:       (p) => <Icon {...p}><path d="M12 2.5l8 3v6.2c0 4.6-3.3 8.4-8 9.8-4.7-1.4-8-5.2-8-9.8V5.5z"/><path d="M9 12l2.2 2.2L15.5 10"/></Icon>,
+  doacao:       (p) => <Icon {...p}><path d="M20.4 5.6a5 5 0 0 0-7.1 0L12 6.9l-1.3-1.3a5 5 0 0 0-7.1 7.1L12 21l8.4-8.3a5 5 0 0 0 0-7.1z"/></Icon>,
+  investimento: (p) => <Icon {...p}><path d="M3 20V10M9 20V4M15 20v-7M21 20V7"/></Icon>,
+  salario:      (p) => <Icon {...p}><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 8.5h20"/><circle cx="12" cy="14" r="2.2"/></Icon>,
+  prolabore:    (p) => <Icon {...p}><rect x="2.5" y="7" width="19" height="13" rx="2"/><path d="M8.5 7V5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v2"/><path d="M2.5 12.5h19"/></Icon>,
+  empresa:      (p) => <Icon {...p}><path d="M3 21V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15"/><path d="M13 10h7a1 1 0 0 1 1 1v10"/><path d="M2 21h20"/><path d="M6.5 9h3M6.5 13h3M16.5 14h1.5M16.5 17.5h1.5"/></Icon>,
+  extras:       (p) => <Icon {...p}><path d="M12 2.5l2.9 5.9 6.6 1-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5-4.8-4.6 6.6-1z"/></Icon>
+};
+
+const ICONES_CATEGORIA = [
+  { id: "mercado",      rotulo: "Mercado" },
+  { id: "combustivel",  rotulo: "Combustível" },
+  { id: "saude",        rotulo: "Saúde" },
+  { id: "casa",         rotulo: "Casa" },
+  { id: "contas",       rotulo: "Luz / água" },
+  { id: "educacao",     rotulo: "Educação" },
+  { id: "transporte",   rotulo: "Transporte" },
+  { id: "restaurante",  rotulo: "Restaurante" },
+  { id: "lazer",        rotulo: "Lazer" },
+  { id: "vestuario",    rotulo: "Roupas" },
+  { id: "pets",         rotulo: "Pets" },
+  { id: "financiamento",rotulo: "Financiamento" },
+  { id: "imposto",      rotulo: "Impostos" },
+  { id: "presente",     rotulo: "Presentes" },
+  { id: "viagem",       rotulo: "Viagem" },
+  { id: "telefone",     rotulo: "Telefone" },
+  { id: "internet",     rotulo: "Internet" },
+  { id: "academia",     rotulo: "Academia" },
+  { id: "seguro",       rotulo: "Seguro" },
+  { id: "doacao",       rotulo: "Doação" },
+  { id: "investimento", rotulo: "Investimento" },
+  { id: "salario",      rotulo: "Salário" },
+  { id: "prolabore",    rotulo: "Pró-labore" },
+  { id: "empresa",      rotulo: "Empresa" },
+  { id: "extras",       rotulo: "Extras" },
+  { id: "outros",       rotulo: "Outros" }
+];
+
+/* Categoria que ja existe (ou que o usuario acabou de criar) ganha um
+   desenho pelo nome, sem ninguem ter que escolher na mao. */
+const PALPITES_ICONE = [
+  [/mercado|supermerc|feira|acougue|padaria|hortifr/, "mercado"],
+  [/combust|gasolin|posto|etanol|diesel|alcool/, "combustivel"],
+  [/saude|farmac|medic|remedi|dentist|hospital|plano de saude|exame/, "saude"],
+  [/casa|moradia|aluguel|condomin|reforma|movei/, "casa"],
+  [/conta.*fixa|luz|energia|agua|esgoto|gas\b/, "contas"],
+  [/educa|escola|faculdad|curso|mensalidade|livro|material escolar/, "educacao"],
+  [/transport|uber|onibus|taxi|estacionament|pedagi|carro|veicul/, "transporte"],
+  [/aliment|restaurant|lanche|comida|delivery|ifood|refeic/, "restaurante"],
+  [/lazer|cinema|show|streaming|netflix|spotify|divers|bar\b/, "lazer"],
+  [/vestua|roupa|calcad|sapat|moda/, "vestuario"],
+  [/pet|cachorr|gat[oa]|veterinar|racao/, "pets"],
+  [/financ|emprest|consorci|parcelament|prestac/, "financiamento"],
+  [/imposto|taxa|tribut|iptu|ipva|darf|inss|multa/, "imposto"],
+  [/presente|aniversar|natal/, "presente"],
+  [/viagem|passagem|hotel|hosped|turismo/, "viagem"],
+  [/telefon|celular|chip|operadora/, "telefone"],
+  [/internet|banda larga|wifi|provedor/, "internet"],
+  [/academia|ginast|crossfit|pilates|esporte/, "academia"],
+  [/seguro/, "seguro"],
+  [/doacao|dizimo|caridad|igreja|oferta/, "doacao"],
+  [/investiment|aplicac|poupanc|renda fixa|acoes|tesouro/, "investimento"],
+  [/salari|holerite|folha/, "salario"],
+  [/pro.?labore/, "prolabore"],
+  [/retirada|empresa|distribuic|lucro|dividend/, "empresa"],
+  [/extra|bonus|freela|adicional|premio|estrela/, "extras"]
+];
+
+function adivinharIcone(nome, tipo) {
+  const n = normalizarTexto(nome);
+  for (const [re, id] of PALPITES_ICONE) if (re.test(n)) return id;
+  return tipo === "receita" ? "salario" : "outros";
+}
+
+/* O desenho da categoria. Sem categoria, um circulo vazado — que
+   tambem e uma forma, nao uma cor. */
+function IconeCategoria({ id, size = 15, className, style }) {
+  const F = IC[id] || IC.outros;
+  return <F size={size} className={className} style={style} />;
+}
+
+/* Marca da categoria: desenho + cor. O desenho e quem identifica;
+   a cor so reforca. */
+function MarcaCategoria({ categoria, size = 15 }) {
+  const cor = (categoria && categoria.cor) || "#7F8EA3";
+  return (
+    <span style={{ color: cor, display: "inline-flex", alignItems: "center" }}
+          title={(categoria && categoria.nome) || "Sem categoria"}>
+      <IconeCategoria id={categoria && categoria.icone} size={size} />
+    </span>
+  );
+}
+
+
+/* ===========================================================
    DROPBOX — OAuth2 com PKCE, escopo "App folder".
    Funciona em qualquer navegador, inclusive no celular. Nao ha
    client secret no fluxo PKCE, entao a App Key pode ficar a
@@ -283,10 +418,12 @@ const NOME_ARQUIVO_DROPBOX = "/prumo-dados.json";
 const PASTA_ENTRADA_DBX  = "/ENTRADA";
 const PASTA_LANCADOS_DBX = "/LANCADOS";
 
-/* A App Key do app novo do Dropbox entra aqui assim que existir.
-   Enquanto estiver vazia, o app pede a chave nas Configuracoes e
-   guarda no navegador. */
-const DROPBOX_APP_KEY_PADRAO = "";
+/* App Key do app "Prumo" no Dropbox. E publica por natureza: no fluxo
+   PKCE nao existe client secret no navegador, entao deixar fixa aqui
+   nao expoe nada — so evita ter que digitar de novo a cada versao,
+   inclusive no celular, onde cada versao nova ganha localStorage
+   proprio. A chave da Anthropic, essa sim, nunca entra no codigo. */
+const DROPBOX_APP_KEY_PADRAO = "z7n9irhjhs7n1b0";
 try {
   if (DROPBOX_APP_KEY_PADRAO && !localStorage.getItem(LS_DROPBOX.appKey)) {
     localStorage.setItem(LS_DROPBOX.appKey, DROPBOX_APP_KEY_PADRAO);
@@ -471,9 +608,14 @@ async function dropboxGarantirPastas(codigos) {
    do GitHub Pages e publico.
 =========================================================== */
 
-const CORES_CAT = ["#FF1B4C","#FF7A00","#FFC107","#22C55E","#14B8A6","#38BDF8",
-                   "#6366F1","#A855F7","#EC4899","#94A3B8","#F97316","#84CC16",
-                   "#0EA5E9","#F43F5E","#8B5CF6","#10B981","#EAB308","#64748B"];
+/* Os oito primeiros sao os passos ja validados para fundo escuro
+   (banda de luminosidade, piso de croma, separacao sob daltonismo e
+   contraste contra a superficie). O grafico de categorias mostra no
+   maximo oito fatias + "Outras" justamente por isso — cor de serie
+   nao se inventa nem se repete. */
+const CORES_CAT = ["#3987E5","#D95926","#199E70","#C98500","#D55181","#008300",
+                   "#9085E9","#E66767","#7F8EA3","#A4653A","#2FA3A3","#B0559B",
+                   "#5D7EC9","#8A9A2B","#C2703F","#6B6F8F","#3F8F6A","#9A4F6A"];
 
 const CATEGORIAS_PADRAO = [
   { nome: "Mercado",           tipo: "despesa", repetitiva: true  },
@@ -499,7 +641,8 @@ const CATEGORIAS_PADRAO = [
 function categoriasIniciais() {
   return CATEGORIAS_PADRAO.map((c, i) => ({
     id: "cat-" + i, nome: c.nome, tipo: c.tipo,
-    repetitiva: c.repetitiva, cor: CORES_CAT[i % CORES_CAT.length], ativa: true
+    repetitiva: c.repetitiva, cor: CORES_CAT[i % CORES_CAT.length],
+    icone: adivinharIcone(c.nome, c.tipo), ativa: true
   }));
 }
 
@@ -545,7 +688,10 @@ function normalizarEnvelope(bruto) {
   // Conta e cartao de arquivo antigo entram como PF, que era o unico caso.
   const contas = arr(bruto.contas).map(c => Object.assign({ titularidade: "PF" }, c,
     { codigo: c.codigo || paraCodigo((c.titularidade || "PF") + "-" + (c.banco || c.nome || "CONTA")) }));
-  const cartoes = arr(bruto.cartoes).map(c => Object.assign({ titularidade: "PF" }, c));
+  /* O cartao tambem ganha codigo: ele tem pasta propria no Dropbox,
+     porque as faturas sao varias e chegam separadas por cartao. */
+  const cartoes = arr(bruto.cartoes).map(c => Object.assign({ titularidade: "PF" }, c,
+    { codigo: c.codigo || paraCodigo((c.titularidade || "PF") + "-" + (c.banco || "") + "-CARTAO-" + (c.nome || "")) }));
   return {
     versao: 2,
     lancamentos: arr(bruto.lancamentos),
@@ -559,7 +705,10 @@ function normalizarEnvelope(bruto) {
       : Object.assign({}, c, { parcelas: gerarParcelas(c, []).parcelas })),
     aplicacoes: arr(bruto.aplicacoes),
     coberturas: arr(bruto.coberturas),
-    categorias: arr(bruto.categorias).length ? arr(bruto.categorias) : base.categorias,
+    /* Categoria sem desenho (arquivo de antes da v4) ganha um pelo
+       nome — ninguem precisa sair escolhendo icone de 18 categorias. */
+    categorias: (arr(bruto.categorias).length ? arr(bruto.categorias) : base.categorias)
+      .map(c => c.icone ? c : Object.assign({}, c, { icone: adivinharIcone(c.nome, c.tipo) })),
     recorrentes: arr(bruto.recorrentes),
     config: Object.assign({}, base.config, bruto.config || {}),
     salvoEm: bruto.salvoEm || null
@@ -1000,6 +1149,64 @@ function variacaoAplicacao(ap) {
   return { valor: atual - antes, pct: antes ? ((atual - antes) / antes) * 100 : null, de: h[1].data };
 }
 
+/* ===========================================================
+   CARTAO DE CREDITO — a fatura nao e o mes do calendario.
+   Uma compra do dia 29, num cartao que fecha dia 28, cai na
+   fatura do mes seguinte. Quem manda e o ciclo de fechamento.
+=========================================================== */
+function diaValidoNoMes(ano, mes, dia) {
+  const ultimo = new Date(ano, mes, 0).getDate();
+  return ano + "-" + String(mes).padStart(2, "0") + "-" + String(Math.min(dia || 1, ultimo)).padStart(2, "0");
+}
+function mesMenos(ano, mes, n) {
+  const d = new Date(ano, (mes - 1) - n, 1);
+  return { ano: d.getFullYear(), mes: d.getMonth() + 1 };
+}
+
+/* Ciclo da fatura que VENCE no mes de referencia. */
+function cicloFatura(cartao, mesRef) {
+  const [a, m] = String(mesRef).split("-").map(Number);
+  const V = Number(cartao.diaVencimento) || 10;
+  const F = Number(cartao.diaFechamento) || 1;
+  const vencimento = diaValidoNoMes(a, m, V);
+  // fecha no mesmo mes do vencimento se o fechamento vem antes; senao, no mes anterior
+  const mf = (F < V) ? { ano: a, mes: m } : mesMenos(a, m, 1);
+  const fechamento = diaValidoNoMes(mf.ano, mf.mes, F);
+  const ma = mesMenos(mf.ano, mf.mes, 1);
+  const fechamentoAnterior = diaValidoNoMes(ma.ano, ma.mes, F);
+  return { inicio: diaSeguinte(fechamentoAnterior), fim: fechamento, vencimento: vencimento };
+}
+
+function faturaDoCartao(cartao, lancamentos, mesRef) {
+  const c = cicloFatura(cartao, mesRef);
+  const compras = (lancamentos || [])
+    .filter(l => l.cartaoId === cartao.id)
+    .filter(l => String(l.data) >= c.inicio && String(l.data) <= c.fim)
+    .sort((x, y) => String(x.data).localeCompare(String(y.data)));
+  const total = compras.reduce((s, l) => s + (l.tipo === "receita" ? -1 : 1) * (Number(l.valor) || 0), 0);
+  return { inicio: c.inicio, fim: c.fim, vencimento: c.vencimento, compras: compras, total: total };
+}
+
+/* A fatura ABERTA — a que esta recebendo compras hoje. Quase nunca e
+   a que vence no mes corrente: um cartao que fecha dia 28 esta, no dia
+   31, juntando compras para a fatura de dois meses adiante. Abrir a
+   tela na fatura errada faz o app parecer que perdeu lancamento. */
+function mesFaturaAberta(cartao) {
+  const hoje = dataHojeISO();
+  let mm = mesHoje();
+  for (let i = 0; i < 4; i++) {
+    if (hoje <= cicloFatura(cartao, mm).fim) return mm;
+    mm = mesSomado(mm, 1);
+  }
+  return mm;
+}
+
+/* Soma das faturas ABERTAS de todos os cartoes: e o "quanto ja devo
+   no cartao" que interessa no dia a dia. */
+function totalFaturasAbertas(cartoes, lancamentos) {
+  return (cartoes || []).reduce((s, k) => s + faturaDoCartao(k, lancamentos, mesFaturaAberta(k)).total, 0);
+}
+
 
 /* ===========================================================
    PECAS DE TELA
@@ -1275,10 +1482,16 @@ function ModalLancamento({ inicial, dados, refLancamentos, dadosProntos, onSalva
         </div>
 
         <Campo label="Categoria">
-          <Selecao value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-            <option value="">— escolha —</option>
-            {cats.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-          </Selecao>
+          <div className="flex items-center gap-2">
+            <span style={{ width: 34, height: 34, borderRadius: 8, display: "inline-flex", alignItems: "center",
+                           justifyContent: "center", background: "var(--superficie)", border: "1px solid var(--borda)" }}>
+              <MarcaCategoria categoria={cats.filter(c => c.id === categoria)[0]} size={18} />
+            </span>
+            <Selecao value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+              <option value="">— escolha —</option>
+              {cats.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            </Selecao>
+          </div>
         </Campo>
 
         <Campo label={tipo === "despesa" ? "Onde foi (estabelecimento)" : "De onde veio"}>
@@ -1415,7 +1628,9 @@ function AbaResumo({ dados, mes, onMes }) {
               return (
                 <div key={c.id}>
                   <div className="flex items-baseline justify-between gap-2 text-[13px]">
-                    <span className="font-semibold">{c.nome}</span>
+                    <span className="font-semibold inline-flex items-center gap-1.5">
+                      <MarcaCategoria categoria={catPorId[c.id]} size={15} /> {c.nome}
+                    </span>
                     <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(c.valor)}</span>
                   </div>
                   <div className="h-1.5 rounded mt-1" style={{ background: "var(--linha)" }}>
@@ -1504,7 +1719,7 @@ function AbaLancamentos({ dados, mes, onMes, onEditar, onNovo, dadosProntos }) {
                       </td>
                       <td className="px-3 py-2" data-rot="Categoria">
                         <span className="inline-flex items-center gap-1.5">
-                          <span style={{ width: 8, height: 8, borderRadius: 8, background: (cat && cat.cor) || "#64748B", display: "inline-block" }} />
+                          <MarcaCategoria categoria={cat} size={15} />
                           {(cat && cat.nome) || "Sem categoria"}
                         </span>
                       </td>
@@ -1560,6 +1775,7 @@ function FiltroTitular({ valor, onValor }) {
 function AbaBancos({ dados, alterar, mes }) {
   const [filtro, setFiltro] = useState("TUDO");
   const [aberta, setAberta] = useState(null);   // conta com extrato aberto
+  const [cartaoAberto, setCartaoAberto] = useState(null); // cartao com fatura aberta
   const [novaApl, setNovaApl] = useState(null); // aplicacao sendo atualizada
 
   const mapaContas = indexarPorId(dados.contas);
@@ -1573,10 +1789,8 @@ function AbaBancos({ dados, alterar, mes }) {
 
   const emConta = contas.reduce((s, c) => s + saldoDaConta(c, dados.lancamentos), 0);
   const aplicado = aplicacoes.reduce((s, a) => s + saldoAplicacao(a), 0);
-  const faturaAberta = (dados.lancamentos || [])
-    .filter(l => l.cartaoId && mapaCartoes[l.cartaoId] && cabe(mapaCartoes[l.cartaoId].titularidade))
-    .filter(l => mesDaData(l.data) === mes)
-    .reduce((s, l) => s + (Number(l.valor) || 0), 0);
+  // a fatura que esta ABERTA em cada cartao, pelo ciclo de fechamento
+  const faturaAberta = totalFaturasAbertas(cartoes, dados.lancamentos);
   const divida = contratos.reduce((s, c) => s + resumoContrato(c).saldoDevedor, 0);
   const liquido = emConta + aplicado - faturaAberta - divida;
 
@@ -1599,6 +1813,9 @@ function AbaBancos({ dados, alterar, mes }) {
   if (aberta) {
     return <ExtratoDaConta conta={aberta} dados={dados} onVoltar={() => setAberta(null)} />;
   }
+  if (cartaoAberto) {
+    return <FaturaCartao cartao={cartaoAberto} dados={dados} mes={mes} onVoltar={() => setCartaoAberto(null)} />;
+  }
 
   return (
     <div className="space-y-4">
@@ -1610,7 +1827,8 @@ function AbaBancos({ dados, alterar, mes }) {
       <div className="grade-totais" style={{ background: "var(--borda)", border: "1px solid var(--borda)" }}>
         <StatCard label={"Em conta" + (filtro === "TUDO" ? "" : " · " + filtro)} valor={currency(emConta)} icone={IconBank} tom={emConta >= 0 ? "ok" : "perigo"} />
         <StatCard label="Aplicado" valor={currency(aplicado)} icone={IconCofre} />
-        <StatCard label={"Fatura de " + mesPorExtenso(mes)} valor={currency(faturaAberta)} icone={IconCard} />
+        <StatCard label="Faturas abertas" valor={currency(faturaAberta)} icone={IconCard}
+                  rodape="o que já entrou no ciclo atual de cada cartão" />
         <StatCard label="Dívida (contratos)" valor={currency(divida)} icone={IconContrato} tom={divida > 0 ? "perigo" : "neutro"} />
       </div>
       <Cartao className="p-3">
@@ -1673,15 +1891,23 @@ function AbaBancos({ dados, alterar, mes }) {
           })}
 
           {b.cartoes.map(k => {
-            const gasto = (dados.lancamentos || []).filter(l => l.cartaoId === k.id && mesDaData(l.data) === mes)
-                                                   .reduce((s, l) => s + (Number(l.valor) || 0), 0);
+            const f = faturaDoCartao(k, dados.lancamentos, mesFaturaAberta(k));
             return (
-              <div key={k.id} className="py-2 flex items-baseline justify-between gap-2" style={{ borderTop: "1px solid var(--linha)" }}>
-                <div>
-                  <span className="text-[13px] font-semibold inline-flex items-center gap-1.5"><IconCard size={13} /> {k.nome || "(sem nome)"}</span>
-                  <span className="text-[11px] ml-2" style={{ color: "var(--suave)" }}>fecha dia {k.diaFechamento} · vence dia {k.diaVencimento}</span>
+              <div key={k.id} className="py-2" style={{ borderTop: "1px solid var(--linha)" }}>
+                <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                  <div>
+                    <span className="text-[13px] font-semibold inline-flex items-center gap-1.5"><IconCard size={13} /> {k.nome || "(sem nome)"}</span>
+                    <span className="text-[11px] ml-2" style={{ color: "var(--suave)" }}>{k.codigo}</span>
+                  </div>
+                  <span className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(f.total)}</span>
                 </div>
-                <span className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(gasto)}</span>
+                <div className="flex items-center gap-2 flex-wrap mt-1">
+                  <span className="text-[11px]" style={{ color: "var(--suave)" }}>
+                    fatura aberta {dataCurta(f.inicio)} a {dataCurta(f.fim)} · fecha {dataCurta(f.fim)}, vence {dataCurta(f.vencimento)} · {f.compras.length} compra(s)
+                  </span>
+                  <button className="text-[11px] underline no-print" style={{ color: "var(--acento-vivo)" }}
+                          onClick={() => setCartaoAberto(k)}>ver fatura</button>
+                </div>
               </div>
             );
           })}
@@ -1862,6 +2088,107 @@ function ExtratoDaConta({ conta, dados, onVoltar }) {
                           style={{ fontFamily: "'JetBrains Mono', monospace", color: l.saldo >= 0 ? "var(--suave)" : "var(--erro-claro)" }}>
                         {currency(l.saldo)}
                       </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Cartao>
+      )}
+    </div>
+  );
+}
+
+/* ===========================================================
+   FATURA DE UM CARTAO — pelo ciclo de fechamento, com as
+   compras daquele periodo e o total que vai ser cobrado.
+=========================================================== */
+function FaturaCartao({ cartao, dados, mes, onVoltar }) {
+  // abre na fatura ABERTA, nao na que vence no mes corrente
+  const [mesFatura, setMesFatura] = useState(() => mesFaturaAberta(cartao));
+  const catPorId = indexarPorId(dados.categorias);
+  const contaPorId = indexarPorId(dados.contas);
+  const f = faturaDoCartao(cartao, dados.lancamentos, mesFatura);
+  const contaDebito = contaPorId[cartao.contaDebitoId];
+  const limite = Number(cartao.limite) || 0;
+  const usado = limite ? Math.min(100, (f.total / limite) * 100) : 0;
+  /* Sem isto da para olhar uma fatura ja paga achando que e a do mes.
+     A fatura que esta recebendo compras hoje quase nunca e a que
+     vence no mes corrente. */
+  const hoje = dataHojeISO();
+  const estado = hoje > f.fim ? "fechada" : (hoje >= f.inicio ? "aberta" : "futura");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Botao tom="neutro" onClick={onVoltar} className="no-print">‹ Bancos</Botao>
+        <h2 className="text-base font-bold inline-flex items-center gap-1.5"><IconCard size={16} /> {cartao.nome}</h2>
+        <ChipTitular valor={cartao.titularidade} />
+        <span className="text-[12px]" style={{ color: "var(--suave)" }}>{cartao.banco} · {cartao.codigo}</span>
+        <div className="ml-auto no-print"><SeletorMes mes={mesFatura} onMes={setMesFatura} /></div>
+      </div>
+
+      <div className="grade-totais" style={{ background: "var(--borda)", border: "1px solid var(--borda)" }}>
+        <StatCard label="Total da fatura" valor={currency(f.total)} icone={IconCard} tom={f.total > 0 ? "perigo" : "neutro"} />
+        <StatCard label="Período" valor={dataCurta(f.inicio) + " a " + dataCurta(f.fim)} rodape={"fecha dia " + cartao.diaFechamento} />
+        <StatCard label="Vencimento" valor={dataCurta(f.vencimento)} rodape={contaDebito ? "debita em " + contaDebito.nome : "sem conta ligada"} />
+        <StatCard label="Compras" valor={String(f.compras.length)} rodape={limite ? "limite " + currency(limite) : "sem limite cadastrado"} />
+      </div>
+
+      <Faixa tom="aviso">
+        {estado === "aberta"
+          ? "Fatura ABERTA: ainda entram compras até " + dataCurta(f.fim) + ", quando ela fecha."
+          : estado === "fechada"
+          ? "Fatura FECHADA em " + dataCurta(f.fim) + ". As compras de hoje vão para uma fatura seguinte."
+          : "Fatura FUTURA: começa a receber compras em " + dataCurta(f.inicio) + "."}
+      </Faixa>
+
+      {limite ? (
+        <Cartao className="p-3">
+          <div className="flex items-baseline justify-between text-[12px]">
+            <span style={{ color: "var(--suave)" }}>uso do limite nesta fatura</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{usado.toFixed(0)}%</span>
+          </div>
+          <div className="h-1.5 rounded mt-1.5" style={{ background: "var(--linha)" }}>
+            <div className="h-1.5 rounded" style={{ width: usado + "%", background: usado > 80 ? "var(--perigo)" : "var(--acento)" }} />
+          </div>
+        </Cartao>
+      ) : null}
+
+      {f.compras.length === 0 ? (
+        <Cartao><Vazio texto="Nenhuma compra nesta fatura." /></Cartao>
+      ) : (
+        <Cartao className="overflow-hidden">
+          <div className="rolagem-resp" style={{ overflowX: "auto" }}>
+            <table className="tab-resp w-full text-[13px]">
+              <thead>
+                <tr style={{ background: "var(--barra)", color: "var(--na-barra-suave)" }}>
+                  <th className="text-left font-semibold px-3 py-2">Data</th>
+                  <th className="text-left font-semibold px-3 py-2">Estabelecimento</th>
+                  <th className="text-left font-semibold px-3 py-2">Categoria</th>
+                  <th className="text-right font-semibold px-3 py-2">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {f.compras.map(l => {
+                  const cat = catPorId[l.categoria];
+                  return (
+                    <tr key={l.id} style={{ borderTop: "1px solid var(--linha)" }}>
+                      <td className="px-3 py-2" data-rot="Data" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{dataCurta(l.data)}</td>
+                      <td className="px-3 py-2" data-rot="Estabelecimento">
+                        <div className="font-semibold">{l.estabelecimento || l.descricao || "(sem nome)"}</div>
+                        <div className="text-[11px]" style={{ color: "var(--suave)" }}>
+                          {l.origem === "fatura" ? "veio da fatura" : l.origem === "foto" ? "veio da foto" : "digitado"}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2" data-rot="Categoria">
+                        <span className="inline-flex items-center gap-1.5">
+                          <MarcaCategoria categoria={cat} size={15} />
+                          {(cat && cat.nome) || "Sem categoria"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right" data-rot="Valor" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(l.valor)}</td>
                     </tr>
                   );
                 })}
@@ -2202,6 +2529,357 @@ function PainelContrato({ contrato, dados, onVoltar, onEditar, onBaixar, onExclu
 
 
 /* ===========================================================
+   ABA GRAFICOS
+   Regras seguidas aqui, de proposito:
+   - a forma vem do trabalho do dado: comparar tamanho entre
+     nomes = barra horizontal ordenada; mudanca no tempo = barra
+     por mes. Nada de pizza, nada de dois eixos.
+   - cor de serie e so das DUAS series (entrou/saiu), e essas
+     duas foram validadas para daltonismo e contraste. As barras
+     de categoria carregam o nome escrito ao lado, entao a
+     identidade nunca depende da cor.
+   - no maximo 8 categorias no grafico; da nona em diante vira
+     "Outras". Cor de serie nao se inventa nem se repete.
+   - todo grafico tem o "ver números" com a tabela do lado.
+=========================================================== */
+
+function curtoBRL(n) {
+  const v = Number(n) || 0;
+  const abs = Math.abs(v);
+  if (abs >= 1000000) return "R$ " + (v / 1000000).toFixed(1).replace(".", ",") + " mi";
+  if (abs >= 1000) return "R$ " + (v / 1000).toFixed(1).replace(".", ",") + " mil";
+  return "R$ " + v.toFixed(0);
+}
+
+/* Dica que segue o dedo/mouse. Um grafico em tela e interativo:
+   sem isso o valor exato de cada barra fica adivinhado. */
+function useDica() {
+  const [dica, setDica] = useState(null);
+  const caixaRef = useRef(null);
+  const mostrar = (ev, conteudo) => {
+    const caixa = caixaRef.current;
+    if (!caixa) return;
+    const r = caixa.getBoundingClientRect();
+    const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+    const cy = (ev.touches ? ev.touches[0].clientY : ev.clientY) - r.top;
+    setDica({ x: Math.min(Math.max(cx, 70), r.width - 70), y: Math.max(cy - 12, 8), conteudo: conteudo });
+  };
+  const esconder = () => setDica(null);
+  const elemento = dica ? (
+    <div className="no-print" style={{
+      position: "absolute", left: dica.x, top: dica.y, transform: "translate(-50%,-100%)",
+      background: "var(--barra)", border: "1px solid var(--borda)", borderRadius: 6,
+      padding: "6px 9px", fontSize: 12, whiteSpace: "nowrap", pointerEvents: "none", zIndex: 5,
+      boxShadow: "0 4px 14px rgba(0,0,0,.5)"
+    }}>{dica.conteudo}</div>
+  ) : null;
+  return { caixaRef, mostrar, esconder, elemento };
+}
+
+/* Barras horizontais ordenadas: o nome fica escrito na barra e o
+   valor na ponta, entao da para ler sem consultar legenda. */
+function BarrasHorizontais({ itens, vazio }) {
+  const { caixaRef, mostrar, esconder, elemento } = useDica();
+  const maior = itens.reduce((m, i) => Math.max(m, i.valor), 0);
+  const total = itens.reduce((s, i) => s + i.valor, 0);
+  if (!itens.length) return <Vazio texto={vazio} />;
+  return (
+    <div ref={caixaRef} style={{ position: "relative" }}>
+      {elemento}
+      <div className="space-y-2.5">
+        {itens.map(i => {
+          const pct = maior ? (i.valor / maior) * 100 : 0;
+          const share = total ? (i.valor / total) * 100 : 0;
+          return (
+            <div key={i.id}
+                 onMouseMove={(e) => mostrar(e, i.rotulo + " · " + currency(i.valor) + " · " + share.toFixed(1).replace(".", ",") + "% do total")}
+                 onMouseLeave={esconder}
+                 onTouchStart={(e) => mostrar(e, i.rotulo + " · " + currency(i.valor))}
+                 onTouchEnd={esconder}>
+              <div className="flex items-baseline justify-between gap-2 text-[13px]">
+                <span className="font-semibold inline-flex items-center gap-1.5">
+                  {i.marca}{i.rotulo}
+                </span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(i.valor)}</span>
+              </div>
+              <div style={{ height: 10, background: "var(--linha)", borderRadius: 5, marginTop: 4 }}>
+                <div className="barra-dado" style={{
+                  width: Math.max(pct, 1.5) + "%", height: 10, borderRadius: 5,
+                  background: i.cor, transition: "width .2s"
+                }} />
+              </div>
+              <div className="text-[11px] mt-0.5" style={{ color: "var(--suave)" }}>
+                {share.toFixed(1).replace(".", ",")}% do total{i.detalhe ? " · " + i.detalhe : ""}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* Entrou e saiu, mes a mes. Duas series, um eixo so, legenda
+   presente. Rola na horizontal no celular em vez de encolher a
+   ponto de ninguem ler os rotulos. */
+function GraficoMesAMes({ dadosMeses }) {
+  const { caixaRef, mostrar, esconder, elemento } = useDica();
+  /* No celular cabem uns seis meses. Abrir mostrando setembro do ano
+     passado, que costuma estar vazio, e inutil — a tela abre no mes
+     escolhido, que fica na ponta direita. */
+  const rolagemRef = useRef(null);
+  useEffect(() => {
+    const el = rolagemRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [dadosMeses]);
+  const L = 52, R = 8, T = 12, B = 26;
+  const larguraMes = 54;
+  const W = L + R + dadosMeses.length * larguraMes;
+  const H = 200;
+  const alturaPlot = H - T - B;
+  const maior = dadosMeses.reduce((m, d) => Math.max(m, d.entrou, d.saiu), 0) || 1;
+  const y = (v) => T + alturaPlot - (v / maior) * alturaPlot;
+  const marcas = [0, 0.5, 1].map(f => f * maior);
+
+  return (
+    <div ref={caixaRef} style={{ position: "relative" }}>
+      {elemento}
+      <div className="flex items-center gap-4 mb-2 text-[12px]">
+        <span className="inline-flex items-center gap-1.5" style={{ color: "var(--serie-entrou)" }}>
+          <IconTrendUp size={14} /> <span style={{ color: "var(--texto)" }}>Entrou</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5" style={{ color: "var(--serie-saiu)" }}>
+          <IconTrendDown size={14} /> <span style={{ color: "var(--texto)" }}>Saiu</span>
+        </span>
+      </div>
+      <div ref={rolagemRef} style={{ overflowX: "auto" }}>
+        <svg viewBox={"0 0 " + W + " " + H} width={W} height={H} style={{ maxWidth: "none" }} role="img"
+             aria-label="Entrou e saiu por mês">
+          {marcas.map((v, i) => (
+            <g key={i}>
+              <line x1={L} y1={y(v)} x2={W - R} y2={y(v)} stroke="var(--grade-eixo)" strokeWidth="1" />
+              <text x={L - 6} y={y(v) + 3.5} textAnchor="end" fontSize="9" fill="var(--grade-texto)">{curtoBRL(v)}</text>
+            </g>
+          ))}
+          {dadosMeses.map((d, i) => {
+            const x0 = L + i * larguraMes;
+            const larg = 17;
+            const dica = d.rotuloLongo + " — entrou " + currency(d.entrou) + ", saiu " + currency(d.saiu);
+            return (
+              <g key={d.mes}
+                 onMouseMove={(e) => mostrar(e, dica)} onMouseLeave={esconder}
+                 onTouchStart={(e) => mostrar(e, dica)} onTouchEnd={esconder}>
+                <rect x={x0 + 4} y={T} width={larguraMes - 8} height={alturaPlot} fill="transparent" />
+                <rect className="barra-dado" x={x0 + 6} y={y(d.entrou)} width={larg}
+                      height={Math.max(alturaPlot - (y(d.entrou) - T), 0)} rx="3" fill="var(--serie-entrou)" />
+                <rect className="barra-dado" x={x0 + 6 + larg + 2} y={y(d.saiu)} width={larg}
+                      height={Math.max(alturaPlot - (y(d.saiu) - T), 0)} rx="3" fill="var(--serie-saiu)" />
+                <text x={x0 + larguraMes / 2} y={H - 9} textAnchor="middle" fontSize="9" fill="var(--grade-texto)">{d.rotulo}</text>
+              </g>
+            );
+          })}
+          <line x1={L} y1={T + alturaPlot} x2={W - R} y2={T + alturaPlot} stroke="var(--grade-eixo)" strokeWidth="1.5" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function TabelaNumeros({ colunas, linhas }) {
+  return (
+    <div className="rolagem-resp" style={{ overflowX: "auto" }}>
+      <table className="tab-resp w-full text-[13px]">
+        <thead>
+          <tr style={{ background: "var(--barra)", color: "var(--na-barra-suave)" }}>
+            {colunas.map((c, i) => (
+              <th key={i} className={"font-semibold px-3 py-2 " + (i ? "text-right" : "text-left")}>{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map((l, i) => (
+            <tr key={i} style={{ borderTop: "1px solid var(--linha)" }}>
+              {l.map((c, j) => (
+                <td key={j} className={"px-3 py-2 " + (j ? "text-right" : "")} data-rot={colunas[j]}
+                    style={j ? { fontFamily: "'JetBrains Mono', monospace" } : null}>{c}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function BlocoGrafico({ titulo, sub, icone: IconC, numeros, children }) {
+  const [tabela, setTabela] = useState(false);
+  return (
+    <Cartao className="p-4">
+      <div className="flex items-start justify-between gap-2 mb-1 flex-wrap">
+        <div className="flex items-center gap-2">
+          {IconC ? <IconC size={15} style={{ color: "var(--acento-vivo)" }} /> : null}
+          <h3 className="text-sm font-bold">{titulo}</h3>
+        </div>
+        {numeros ? (
+          <button className="text-[11px] underline no-print" style={{ color: "var(--acento-vivo)" }}
+                  onClick={() => setTabela(v => !v)}>
+            {tabela ? "ver gráfico" : "ver números"}
+          </button>
+        ) : null}
+      </div>
+      {sub ? <p className="text-[12px] mb-3" style={{ color: "var(--suave)" }}>{sub}</p> : <div className="mb-3" />}
+      {tabela && numeros ? <TabelaNumeros colunas={numeros.colunas} linhas={numeros.linhas} /> : children}
+    </Cartao>
+  );
+}
+
+const MAX_FATIAS = 8; // da nona categoria em diante, vira "Outras"
+
+/* "Cartão Cartão Nubank" fica feio: so prefixa quando o nome
+   dado pelo usuario ainda nao diz que e cartao. */
+function nomeDaOrigem(obj, ehCartao) {
+  const nome = obj.nome || obj.codigo || "(sem nome)";
+  if (!ehCartao) return nome;
+  return /^cart[aã]o/i.test(nome.trim()) ? nome : "Cartão " + nome;
+}
+
+function AbaGraficos({ dados, mes, onMes }) {
+  const [filtro, setFiltro] = useState("TUDO");
+  const mapaContas = indexarPorId(dados.contas);
+  const mapaCartoes = indexarPorId(dados.cartoes);
+  const catPorId = indexarPorId(dados.categorias);
+  const cabe = (l) => filtro === "TUDO" || titularidadeDoLancamento(l, mapaContas, mapaCartoes) === filtro;
+  const todos = (dados.lancamentos || []).filter(cabe);
+
+  const doMes = todos.filter(l => mesDaData(l.data) === mes);
+  const despesasMes = doMes.filter(l => (l.tipo || "despesa") === "despesa");
+
+  /* 1) Despesa por categoria, do mes escolhido */
+  const porCategoria = useMemo(() => {
+    const acc = {};
+    despesasMes.forEach(l => {
+      const k = l.categoria || "sem";
+      acc[k] = (acc[k] || 0) + (Number(l.valor) || 0);
+    });
+    const lista = Object.keys(acc).map(k => ({
+      id: k,
+      rotulo: (catPorId[k] && catPorId[k].nome) || "Sem categoria",
+      valor: acc[k],
+      cor: (catPorId[k] && catPorId[k].cor) || "#7F8EA3",
+      marca: <MarcaCategoria categoria={catPorId[k]} size={15} />
+    })).sort((a, b) => b.valor - a.valor);
+    if (lista.length <= MAX_FATIAS) return lista;
+    const cabeca = lista.slice(0, MAX_FATIAS);
+    const resto = lista.slice(MAX_FATIAS);
+    cabeca.push({
+      id: "outras", rotulo: "Outras (" + resto.length + ")",
+      valor: resto.reduce((s, x) => s + x.valor, 0), cor: "#7F8EA3",
+      marca: <span style={{ color: "#7F8EA3", display: "inline-flex" }}><IconeCategoria id="outros" size={15} /></span>
+    });
+    return cabeca;
+  }, [despesasMes, catPorId]);
+
+  /* 2) Entrou e saiu nos ultimos 12 meses */
+  const mesesSerie = useMemo(() => {
+    const out = [];
+    for (let i = 11; i >= 0; i--) {
+      const mm = mesSomado(mes, -i);
+      const doMM = todos.filter(l => mesDaData(l.data) === mm);
+      const entrou = doMM.filter(l => l.tipo === "receita").reduce((s, l) => s + (Number(l.valor) || 0), 0);
+      const saiu = doMM.filter(l => (l.tipo || "despesa") === "despesa").reduce((s, l) => s + (Number(l.valor) || 0), 0);
+      const [a, m] = mm.split("-");
+      out.push({ mes: mm, rotulo: m + "/" + a.slice(2), rotuloLongo: mesPorExtenso(mm), entrou: entrou, saiu: saiu });
+    }
+    return out;
+  }, [todos, mes]);
+
+  /* 3) De onde o dinheiro saiu: por conta e por cartao */
+  const porOrigem = useMemo(() => {
+    const acc = {};
+    despesasMes.forEach(l => {
+      const chave = l.cartaoId ? "k:" + l.cartaoId : l.contaId ? "c:" + l.contaId : "dinheiro";
+      acc[chave] = (acc[chave] || 0) + (Number(l.valor) || 0);
+    });
+    return Object.keys(acc).map(k => {
+      if (k === "dinheiro") return { id: k, rotulo: "Dinheiro / sem conta", valor: acc[k], cor: "#7F8EA3", detalhe: "",
+        marca: <span style={{ color: "#7F8EA3", display: "inline-flex" }}><IconWallet size={15} /></span> };
+      const ehCartao = k.indexOf("k:") === 0;
+      const obj = ehCartao ? mapaCartoes[k.slice(2)] : mapaContas[k.slice(2)];
+      if (!obj) return { id: k, rotulo: "(removido)", valor: acc[k], cor: "#7F8EA3", detalhe: "",
+        marca: <span style={{ color: "#7F8EA3", display: "inline-flex" }}><IconAlert size={15} /></span> };
+      return {
+        id: k,
+        rotulo: nomeDaOrigem(obj, ehCartao),
+        valor: acc[k],
+        cor: ehCartao ? "var(--serie-saiu)" : "var(--serie-entrou)",
+        marca: (
+          <span style={{ color: ehCartao ? "var(--serie-saiu)" : "var(--serie-entrou)", display: "inline-flex" }}>
+            {ehCartao ? <IconCard size={15} /> : <IconBank size={15} />}
+          </span>
+        ),
+        detalhe: (obj.banco || "") + " · " + (obj.titularidade || "PF")
+      };
+    }).sort((a, b) => b.valor - a.valor);
+  }, [despesasMes, mapaContas, mapaCartoes]);
+
+  const totalSaiu = despesasMes.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+  const totalEntrou = doMes.filter(l => l.tipo === "receita").reduce((s, l) => s + (Number(l.valor) || 0), 0);
+  const mediaSaiu = mesesSerie.filter(m => m.saiu > 0);
+  const media = mediaSaiu.length ? mediaSaiu.reduce((s, m) => s + m.saiu, 0) / mediaSaiu.length : 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-base font-bold">Gráficos{filtro === "TUDO" ? "" : " · " + filtro}</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <FiltroTitular valor={filtro} onValor={setFiltro} />
+          <SeletorMes mes={mes} onMes={onMes} />
+        </div>
+      </div>
+
+      <div className="grade-totais" style={{ background: "var(--borda)", border: "1px solid var(--borda)" }}>
+        <StatCard label={"Saiu em " + mesPorExtenso(mes)} valor={currency(totalSaiu)} icone={IconTrendDown} tom="perigo"
+                  rodape={media ? (totalSaiu > media ? "acima" : "abaixo") + " da média de " + currency(media) : "sem histórico"} />
+        <StatCard label="Entrou" valor={currency(totalEntrou)} icone={IconTrendUp} tom="ok" />
+        <StatCard label="Categorias com gasto" valor={String(porCategoria.length)} icone={IconTag} />
+        <StatCard label="Maior categoria" valor={porCategoria.length ? porCategoria[0].rotulo : "—"} icone={IconTag}
+                  rodape={porCategoria.length ? currency(porCategoria[0].valor) : ""} />
+      </div>
+
+      <BlocoGrafico titulo={"Despesas por categoria · " + mesPorExtenso(mes)} icone={IconTag}
+        sub={porCategoria.length > MAX_FATIAS ? "As oito maiores; o resto está somado em “Outras”." : "Ordenado da maior para a menor."}
+        numeros={{
+          colunas: ["Categoria", "Valor", "% do mês"],
+          linhas: porCategoria.map(c => [c.rotulo, currency(c.valor),
+            (totalSaiu ? (c.valor / totalSaiu) * 100 : 0).toFixed(1).replace(".", ",") + "%"])
+        }}>
+        <BarrasHorizontais itens={porCategoria} vazio="Nenhuma despesa neste mês ainda." />
+      </BlocoGrafico>
+
+      <BlocoGrafico titulo="Entrou e saiu, mês a mês" icone={IconGrid}
+        sub="Os doze meses até o mês escolhido. Mesma escala nas duas séries."
+        numeros={{
+          colunas: ["Mês", "Entrou", "Saiu", "Sobrou"],
+          linhas: mesesSerie.map(m => [m.rotuloLongo, currency(m.entrou), currency(m.saiu), currency(m.entrou - m.saiu)])
+        }}>
+        <GraficoMesAMes dadosMeses={mesesSerie} />
+      </BlocoGrafico>
+
+      <BlocoGrafico titulo={"De onde o dinheiro saiu · " + mesPorExtenso(mes)} icone={IconBank}
+        sub="Conta a conta e cartão a cartão."
+        numeros={{
+          colunas: ["Origem", "Valor", "% do mês"],
+          linhas: porOrigem.map(o => [o.rotulo, currency(o.valor),
+            (totalSaiu ? (o.valor / totalSaiu) * 100 : 0).toFixed(1).replace(".", ",") + "%"])
+        }}>
+        <BarrasHorizontais itens={porOrigem} vazio="Nenhuma despesa neste mês ainda." />
+      </BlocoGrafico>
+    </div>
+  );
+}
+
+
+/* ===========================================================
    PROCURAR DUPLICADOS
    Pontuacao decide qual registro fica. Item que repete por
    natureza NUNCA vem pre-marcado.
@@ -2270,6 +2948,41 @@ function Secao({ titulo, icone: IconC, children, sub }) {
   );
 }
 
+/* Escolha do desenho da categoria. Grade de pictogramas: o desenho
+   e o que identifica a categoria na lista, no grafico e no papel. */
+function SeletorIcone({ valor, cor, onValor }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <button onClick={() => setAberto(v => !v)} title="Escolher o desenho desta categoria"
+        style={{ width: 34, height: 34, borderRadius: 8, display: "inline-flex", alignItems: "center",
+                 justifyContent: "center", background: "var(--superficie)",
+                 border: "1px solid var(--borda)", color: cor || "var(--texto)", cursor: "pointer" }}>
+        <IconeCategoria id={valor} size={18} />
+      </button>
+      {aberto ? (
+        <>
+          <div onClick={() => setAberto(false)} style={{ position: "fixed", inset: 0, zIndex: 19 }} />
+          <div style={{ position: "absolute", zIndex: 20, top: 38, left: 0, width: 254, padding: 8, borderRadius: 10,
+                        background: "var(--fundo)", border: "1px solid var(--borda)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,.55)", display: "grid",
+                        gridTemplateColumns: "repeat(6, 1fr)", gap: 4 }}>
+            {ICONES_CATEGORIA.map(o => (
+              <button key={o.id} title={o.rotulo} onClick={() => { onValor(o.id); setAberto(false); }}
+                style={{ height: 34, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
+                         background: valor === o.id ? "var(--aba-ativa-bg)" : "transparent",
+                         border: "1px solid " + (valor === o.id ? "var(--acento-vivo)" : "transparent"),
+                         color: "var(--texto)", cursor: "pointer" }}>
+                <IconeCategoria id={o.id} size={17} />
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 /* Botao PF/PJ pequeno, usado dentro das linhas de cadastro. */
 function SeletorTitular({ valor, onValor }) {
   return (
@@ -2294,11 +3007,14 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
   const [msg, setMsg] = useState("");
   const conectado = dropboxEstaConectado();
   const redirect = typeof window !== "undefined" ? dropboxRedirectUri() : "";
-  const codigos = (dados.contas || []).map(c => c.codigo).filter(Boolean);
+  /* Cada conta E cada cartao tem pasta propria: as faturas sao
+     varias e chegam separadas. */
+  const codigos = (dados.contas || []).concat(dados.cartoes || []).map(c => c.codigo).filter(Boolean);
 
   const novaConta  = () => ({ id: uid(), nome: "", banco: "", tipo: "corrente", titularidade: "PF", codigo: "", saldoInicial: 0, ativa: true });
-  const novoCartao = () => ({ id: uid(), nome: "", banco: "", titularidade: "PF", limite: 0, diaFechamento: 1, diaVencimento: 10, contaDebitoId: "", ativo: true });
-  const novaCategoria = () => ({ id: uid(), nome: "", tipo: "despesa", cor: CORES_CAT[Math.floor(Math.random() * CORES_CAT.length)], repetitiva: false, ativa: true });
+  const novoCartao = () => ({ id: uid(), nome: "", banco: "", titularidade: "PF", codigo: "", limite: 0, diaFechamento: 1, diaVencimento: 10, contaDebitoId: "", ativo: true });
+  const novaCategoria = () => ({ id: uid(), nome: "", tipo: "despesa", icone: "outros",
+    cor: CORES_CAT[Math.floor(Math.random() * CORES_CAT.length)], repetitiva: false, ativa: true });
   const novaAplicacao = () => ({ id: uid(), nome: "", banco: "", titularidade: "PF", tipo: "CDB", contaId: "", historico: [] });
 
   const mudarLista = (chave, id, campo, valor) =>
@@ -2310,6 +3026,20 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
 
   /* O codigo da conta e o nome da pasta no Dropbox: sai sozinho de
      PF/PJ + banco, e da para trocar a mao se dois bancos colidirem. */
+  const mudarCartaoComCodigo = (id, campo, valor) =>
+    alterar(d => Object.assign({}, d, {
+      cartoes: (d.cartoes || []).map(c => {
+        if (c.id !== id) return c;
+        const nova = Object.assign({}, c, { [campo]: valor });
+        if (campo !== "codigo") {
+          const automatico = paraCodigo((nova.titularidade || "PF") + "-" + (nova.banco || "") + "-CARTAO-" + (nova.nome || ""));
+          const anterior = paraCodigo((c.titularidade || "PF") + "-" + (c.banco || "") + "-CARTAO-" + (c.nome || ""));
+          if (!c.codigo || c.codigo === anterior) nova.codigo = automatico;
+        }
+        return nova;
+      })
+    }));
+
   const mudarContaComCodigo = (id, campo, valor) =>
     alterar(d => Object.assign({}, d, {
       contas: (d.contas || []).map(c => {
@@ -2319,6 +3049,23 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
           const automatico = paraCodigo((nova.titularidade || "PF") + "-" + (nova.banco || nova.nome || "CONTA"));
           const anterior = paraCodigo((c.titularidade || "PF") + "-" + (c.banco || c.nome || "CONTA"));
           if (!c.codigo || c.codigo === anterior) nova.codigo = automatico;
+        }
+        return nova;
+      })
+    }));
+
+  /* Enquanto o desenho ainda for o palpite automatico, ele acompanha
+     o nome que esta sendo digitado. Assim que o usuario escolhe um na
+     mao, para de mudar sozinho. */
+  const mudarCategoriaComIcone = (id, campo, valor) =>
+    alterar(d => Object.assign({}, d, {
+      categorias: (d.categorias || []).map(c => {
+        if (c.id !== id) return c;
+        const nova = Object.assign({}, c, { [campo]: valor });
+        if (campo === "nome" || campo === "tipo") {
+          if (!c.icone || c.icone === adivinharIcone(c.nome, c.tipo)) {
+            nova.icone = adivinharIcone(nova.nome, nova.tipo);
+          }
         }
         return nova;
       })
@@ -2356,7 +3103,7 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
              sub="É onde o arquivo de dados fica e onde a chave da API viaja entre as versões. Pasta própria do app — não a dos fretes.">
         <div className="space-y-3">
           <Campo label="App Key do app do Dropbox"
-                 dica="Criada de graça no painel de desenvolvedores do Dropbox, com acesso do tipo “App folder”.">
+                 dica="Já vem preenchida com a chave do app Prumo. Só mexa se você trocar o app do Dropbox.">
             <Entrada value={appKey} onChange={(e) => setAppKey(e.target.value.trim())} placeholder="ex.: a1b2c3d4e5f6g7h" />
           </Campo>
           <Campo label="Endereço de retorno (Redirect URI) — tem que estar cadastrado igualzinho"
@@ -2395,7 +3142,7 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
       </Secao>
 
       <Secao titulo="Onde mandar os arquivos" icone={IconFolder}
-             sub="Dentro da pasta do app no Dropbox (Aplicativos → Prumo). Extrato, fatura, comprovante, contrato de financiamento e print de aplicação — tudo entra pelas mesmas pastas.">
+             sub="Dentro da pasta do app no Dropbox (Aplicativos → Prumo). Cada conta E cada cartão tem a sua pasta, porque as faturas são várias e chegam separadas.">
         <div className="space-y-1.5 text-[13px]">
           <div className="font-mono px-2 py-1 rounded" style={{ background: "var(--barra)" }}>/ENTRADA</div>
           <div className="text-[12px] pl-2" style={{ color: "var(--suave)" }}>
@@ -2477,12 +3224,15 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
           {(dados.cartoes || []).map(c => (
             <div key={c.id} className="p-2 rounded-md space-y-2" style={{ border: "1px solid var(--linha)" }}>
               <div className="flex items-center gap-2 flex-wrap">
-                <SeletorTitular valor={c.titularidade} onValor={(v) => mudarLista("cartoes", c.id, "titularidade", v)} />
+                <SeletorTitular valor={c.titularidade} onValor={(v) => mudarCartaoComCodigo(c.id, "titularidade", v)} />
+                <span className="text-[11px] font-mono px-2 py-1 rounded" style={{ background: "var(--barra)", color: "var(--suave)" }}>
+                  /ENTRADA/{c.codigo || "—"}
+                </span>
                 <Botao tom="perigo" className="ml-auto" onClick={() => delLista("cartoes", c.id)} titulo="Remover"><IconTrash size={15} /></Botao>
               </div>
               <div className="grade-cad">
-                <Campo label="Nome"><Entrada value={c.nome} onChange={(e) => mudarLista("cartoes", c.id, "nome", e.target.value)} placeholder="Ex.: Cartão principal" /></Campo>
-                <Campo label="Banco"><Entrada value={c.banco} onChange={(e) => mudarLista("cartoes", c.id, "banco", e.target.value)} placeholder="Ex.: Nubank" /></Campo>
+                <Campo label="Nome"><Entrada value={c.nome} onChange={(e) => mudarCartaoComCodigo(c.id, "nome", e.target.value)} placeholder="Ex.: Cartão principal" /></Campo>
+                <Campo label="Banco"><Entrada value={c.banco} onChange={(e) => mudarCartaoComCodigo(c.id, "banco", e.target.value)} placeholder="Ex.: Nubank" /></Campo>
                 <Campo label="Dia do fechamento"><Entrada type="number" min="1" max="31" value={String(c.diaFechamento == null ? 1 : c.diaFechamento)} onChange={(e) => mudarLista("cartoes", c.id, "diaFechamento", Number(e.target.value) || 1)} /></Campo>
                 <Campo label="Dia do vencimento"><Entrada type="number" min="1" max="31" value={String(c.diaVencimento == null ? 10 : c.diaVencimento)} onChange={(e) => mudarLista("cartoes", c.id, "diaVencimento", Number(e.target.value) || 10)} /></Campo>
                 <Campo label="Limite (R$)"><Entrada inputMode="decimal" value={String(c.limite == null ? "" : c.limite)} onChange={(e) => mudarLista("cartoes", c.id, "limite", paraNumero(e.target.value))} /></Campo>
@@ -2533,15 +3283,16 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
       </Secao>
 
       <Secao titulo="Categorias" icone={IconTag}
-             sub="“Repete por natureza” marca o que acontece duas vezes no mesmo dia de verdade (mercado, combustível, refeição). Essas nunca vêm pré-marcadas na tela de duplicados.">
+             sub="Cada categoria tem o seu desenho — é ele que identifica na lista, no gráfico e no papel, onde a cor pode sumir. O desenho acompanha o nome digitado até você escolher um na mão. “Repete por natureza” marca o que acontece duas vezes no mesmo dia de verdade (mercado, combustível, refeição): essas nunca vêm pré-marcadas na tela de duplicados.">
         <div className="space-y-1.5">
           {(dados.categorias || []).map(c => (
             <div key={c.id} className="flex items-center gap-2 flex-wrap p-2 rounded-md" style={{ border: "1px solid var(--linha)" }}>
+              <SeletorIcone valor={c.icone} cor={c.cor} onValor={(v) => mudarLista("categorias", c.id, "icone", v)} />
               <input type="color" value={c.cor || "#64748B"} onChange={(e) => mudarLista("categorias", c.id, "cor", e.target.value)}
                      style={{ width: 28, height: 28, background: "transparent", border: "0", padding: 0 }} title="Cor" />
-              <Entrada value={c.nome} onChange={(e) => mudarLista("categorias", c.id, "nome", e.target.value)}
+              <Entrada value={c.nome} onChange={(e) => mudarCategoriaComIcone(c.id, "nome", e.target.value)}
                        style={{ flex: "1 1 140px", width: "auto" }} placeholder="Nome da categoria" />
-              <Selecao value={c.tipo} onChange={(e) => mudarLista("categorias", c.id, "tipo", e.target.value)} style={{ width: "auto" }}>
+              <Selecao value={c.tipo} onChange={(e) => mudarCategoriaComIcone(c.id, "tipo", e.target.value)} style={{ width: "auto" }}>
                 <option value="despesa">Despesa</option>
                 <option value="receita">Receita</option>
               </Selecao>
@@ -2621,8 +3372,9 @@ function App() {
       const limpo = window.location.origin + window.location.pathname;
       try { window.history.replaceState({}, "", limpo); } catch (e) {}
       if (ok) {
-        const codigos = (lsGet(LS_KEYS.dados) || {}).contas || [];
-        await dropboxGarantirPastas(codigos.map(c => c.codigo).filter(Boolean));
+        const env = lsGet(LS_KEYS.dados) || {};
+        const codigos = (env.contas || []).concat(env.cartoes || []).map(c => c.codigo).filter(Boolean);
+        await dropboxGarantirPastas(codigos);
         setAvisoDbx(""); recarregar();
       }
       else setAvisoDbx("O Dropbox recusou a autorização. Confira se o endereço de retorno cadastrado é exatamente " + dropboxRedirectUri());
@@ -2648,6 +3400,7 @@ function App() {
     { id: "resumo", rotulo: "Resumo", icone: IconGrid },
     { id: "bancos", rotulo: "Bancos", icone: IconBank },
     { id: "lancamentos", rotulo: "Lançamentos", icone: IconList },
+    { id: "graficos", rotulo: "Gráficos", icone: IconTrendUp },
     { id: "contratos", rotulo: "Contratos", icone: IconContrato },
     { id: "config", rotulo: "Ajustes", icone: IconSettings }
   ];
@@ -2711,6 +3464,7 @@ function App() {
         {aba === "resumo" ? <AbaResumo dados={dados} mes={mes} onMes={setMes} /> : null}
         {aba === "bancos" ? <AbaBancos dados={dados} alterar={alterar} mes={mes} /> : null}
         {aba === "contratos" ? <AbaContratos dados={dados} alterar={alterar} /> : null}
+        {aba === "graficos" ? <AbaGraficos dados={dados} mes={mes} onMes={setMes} /> : null}
         {aba === "lancamentos" ? (
           <AbaLancamentos dados={dados} mes={mes} onMes={setMes} dadosProntos={dadosProntos}
                           onNovo={() => setModal({ inicial: null })}
