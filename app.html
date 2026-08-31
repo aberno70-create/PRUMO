@@ -1,0 +1,2765 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<!-- Sem cache: o Safari do iPhone segura a versao antiga por dias.
+     Com isto, toda abertura busca o arquivo novo. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Prumo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%23090A0F'/%3E%3Cpath d='M14 10h20' stroke='%23FF1B4C' stroke-width='3.4' stroke-linecap='round'/%3E%3Cpath d='M24 10v14' stroke='%23FF1B4C' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M24 23l8 9.2-8 12-8-12z' fill='%23FF1B4C'/%3E%3C/svg%3E" />
+<!-- Suporte a "Adicionar a Tela de Inicio" no iPhone/iPad -->
+<link rel="apple-touch-icon" href="data:image/png;base64,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" />
+<link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,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" />
+<link rel="icon" type="image/png" sizes="512x512" href="data:image/png;base64,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" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Prumo" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#090A0F" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+/* ===========================================================
+   PALETA — skin no estilo Opera GX, a mesma do Painel de Bordo.
+   Todas as cores do app saem daqui. Na impressao ela e trocada
+   pela paleta de tinta mais abaixo, para o papel nao sair preto.
+=========================================================== */
+:root {
+  color-scheme: dark;
+  --fundo:#0D0E13; --superficie:#171922; --borda:#2A2E3B; --linha:#232734;
+  --texto:#E9ECF3; --suave:#98A0B0;
+  --barra:#090A0F; --na-barra:#E9ECF3; --na-barra-suave:#79808F;
+  --acento:#FF1B4C; --acento-vivo:#FF5C7C; --sobre-acento:#0D0E13;
+  --ok:#22C55E; --perigo:#FF4D5E;
+  --chip-quente:rgba(255,27,76,0.16); --chip-frio:rgba(34,197,94,0.16);
+  --aviso-bg:#1B1710; --aviso-borda:#4A3A1C; --aviso-linha:#33291A;
+  --erro-bg:#2A1418; --erro-bg2:#331A1E; --erro-borda:#5A2830; --erro-txt:#FF8A96;
+  --ok-claro:#6EE7A0; --erro-claro:#FF9AA5; --ouro-escuro:#E8B84B;
+  --selecionado-bg:#FF1B4C; --selecionado-txt:#FFFFFF;
+  --aba-ativa-bg:rgba(255,27,76,0.16); --aba-ativa-txt:#FF5C7C;
+}
+  body { margin: 0; font-family: 'Inter', sans-serif; background: var(--fundo); color: var(--texto); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 8px; }
+
+  /* ---------------------------------------------------------------
+     GRADES CRITICAS — classe propria no <style>, nunca variante
+     responsiva do Tailwind por CDN (que ja falhou no app de fretes).
+  --------------------------------------------------------------- */
+  .grade-totais { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1px; }
+  .grade-form  { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .grade-form-2 { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .grade-cad   { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  @media (min-width: 640px) {
+    .grade-totais { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .grade-form   { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .grade-form-2 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .grade-cad    { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  }
+
+  /* ---------------------------------------------------------------
+     CELULAR: tabelas largas viram fichas empilhadas. Cada celula
+     ocupa uma linha, com o nome da coluna a esquerda e o valor a
+     direita, para nada mais sair da tela.
+  --------------------------------------------------------------- */
+  @media (max-width: 640px) {
+    table.tab-resp { min-width: 0 !important; width: 100% !important; }
+    table.tab-resp thead { display: none; }
+    table.tab-resp, table.tab-resp tbody, table.tab-resp tr, table.tab-resp td { display: block; width: 100%; }
+    table.tab-resp tr { border-top: 1px solid var(--linha) !important; padding: 6px 0; }
+    table.tab-resp td {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+      text-align: right !important; border: 0 !important; padding: 2px 10px !important;
+      white-space: normal !important; word-break: break-word;
+    }
+    table.tab-resp td::before {
+      content: attr(data-rot); color: var(--suave); font-size: 10px; letter-spacing: .04em;
+      text-transform: uppercase; text-align: left; flex: 0 0 auto; padding-top: 1px;
+    }
+    .rolagem-resp { overflow-x: visible !important; }
+  }
+
+  /* ---------------------------------------------------------------
+     IMPRESSAO — o app e escuro, o papel e branco. A paleta inteira
+     vira tinta: faixa escura com texto claro NAO SAI NO PAPEL, entao
+     as barras viram faixas claras com texto escuro.
+  --------------------------------------------------------------- */
+  @media print {
+    .no-print { display: none !important; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    :root {
+      color-scheme: light;
+      --fundo:#FFFFFF; --superficie:#FFFFFF;
+      --borda:#8C8778; --linha:#B8B2A3;
+      --texto:#14120D; --suave:#403C33;
+      --barra:#E7E2D6; --na-barra:#14120D; --na-barra-suave:#403C33;
+      --acento:#7A4A12; --acento-vivo:#7A4A12; --sobre-acento:#14120D;
+      --ok:#1F4A31; --perigo:#7A1F16;
+      --chip-quente:#F1E7D6; --chip-frio:#E1E9E2;
+      --aviso-bg:#F7F1E4; --aviso-borda:#9C8A63; --aviso-linha:#C9BFA6;
+      --erro-bg:#F7E7E4; --erro-bg2:#F7E7E4; --erro-borda:#A8756C; --erro-txt:#7A1F16;
+      --ok-claro:#1F4A31; --erro-claro:#7A1F16; --ouro-escuro:#6B4310;
+      --selecionado-bg:#E7E2D6; --selecionado-txt:#14120D;
+      --aba-ativa-bg:#FFFFFF; --aba-ativa-txt:#14120D;
+    }
+    body { background: #FFFFFF !important; color: #14120D !important; }
+    .text-white { color: #14120D !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/plain" id="app-source">
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+/* ===========================================================
+   PRUMO — controle de financas pessoais.
+   Arquivo unico, sem build, sem servidor. Mesmo motor do
+   Painel de Bordo: carregador + app.html, auto-atualizacao,
+   Dropbox por PKCE e leitura de documento por IA.
+=========================================================== */
+const APP_VERSION = "v2";
+const NOME_APP = "Prumo";
+
+/* ===========================================================
+   ICONES (SVG desenhado a mao, sem biblioteca externa)
+=========================================================== */
+const Icon = ({ children, size = 16, className = "", ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+       className={className} {...props}>{children}</svg>
+);
+const IconPlus     = (p) => <Icon {...p}><path d="M12 5v14M5 12h14"/></Icon>;
+const IconX        = (p) => <Icon {...p}><path d="M18 6L6 18M6 6l12 12"/></Icon>;
+const IconCheck    = (p) => <Icon {...p}><path d="M20 6L9 17l-5-5"/></Icon>;
+const IconTrash    = (p) => <Icon {...p}><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0l-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></Icon>;
+const IconEdit     = (p) => <Icon {...p}><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></Icon>;
+const IconSettings = (p) => <Icon {...p}><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4"/></Icon>;
+const IconLoader   = (p) => <Icon {...p} className={"animate-spin " + (p.className||"")}><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></Icon>;
+const IconAlert    = (p) => <Icon {...p}><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a1 1 0 0 0 .9 1.5h17.2a1 1 0 0 0 .9-1.5L13.7 3.9a1 1 0 0 0-1.7 0z"/></Icon>;
+const IconTrendUp  = (p) => <Icon {...p}><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></Icon>;
+const IconTrendDown= (p) => <Icon {...p}><path d="M23 18l-9.5-9.5-5 5L1 6"/><path d="M17 18h6v-6"/></Icon>;
+const IconWallet   = (p) => <Icon {...p}><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H5"/><circle cx="17" cy="14" r="1.2"/></Icon>;
+const IconCard     = (p) => <Icon {...p}><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></Icon>;
+const IconBank     = (p) => <Icon {...p}><path d="M3 10l9-6 9 6"/><path d="M5 10v9M19 10v9M9 10v9M15 10v9M3 21h18"/></Icon>;
+const IconTag      = (p) => <Icon {...p}><path d="M20.6 13.4L12 22l-9-9V4a1 1 0 0 1 1-1h9z"/><circle cx="7.5" cy="7.5" r="1.3"/></Icon>;
+const IconList     = (p) => <Icon {...p}><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></Icon>;
+const IconGrid     = (p) => <Icon {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></Icon>;
+const IconDownload = (p) => <Icon {...p}><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></Icon>;
+const IconUpload   = (p) => <Icon {...p}><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M4 21h16"/></Icon>;
+const IconRefresh  = (p) => <Icon {...p}><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></Icon>;
+const IconCloud    = (p) => <Icon {...p}><path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.2 10.3 3.85 3.85 0 0 0 6.5 19z"/></Icon>;
+const IconCopy     = (p) => <Icon {...p}><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></Icon>;
+const IconContrato = (p) => <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></Icon>;
+const IconCofre    = (p) => <Icon {...p}><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="3.4"/><path d="M12 8.6V12M7 20v1.5M17 20v1.5"/></Icon>;
+const IconFolder   = (p) => <Icon {...p}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></Icon>;
+
+/* O prumo: a travessa fixa, o fio e o peso. "Estar no prumo" e o
+   que o app faz com o dinheiro do mes. */
+function LogoMark({ size = 28 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M14 10h20" stroke="var(--acento)" strokeWidth="3.4" strokeLinecap="round" />
+      <path d="M24 10v14" stroke="var(--acento)" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M24 23l8 9.2-8 12-8-12z" fill="var(--acento)" />
+    </svg>
+  );
+}
+
+/* ===========================================================
+   AJUDANTES
+=========================================================== */
+const currency = (n) => (Number(n) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const dataHojeISO = () => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
+const mesDaData = (iso) => String(iso || "").slice(0, 7);
+const mesHoje = () => dataHojeISO().slice(0, 7);
+
+function mesSomado(mesISO, delta) {
+  const [a, m] = String(mesISO).split("-").map(Number);
+  const d = new Date(a, (m - 1) + delta, 1);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+}
+const MESES_PT_ACENTO = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+function mesPorExtenso(mesISO) {
+  const [a, m] = String(mesISO).split("-").map(Number);
+  if (!a || !m) return mesISO;
+  return MESES_PT_ACENTO[m - 1] + " de " + a;
+}
+function dataCurta(iso) {
+  const p = String(iso || "").split("-");
+  return p.length === 3 ? p[2] + "/" + p[1] : (iso || "");
+}
+
+/* Numero digitado no celular: aceita "1.234,56", "1234.56" e "1234,56". */
+function paraNumero(txt) {
+  if (typeof txt === "number") return txt;
+  let s = String(txt == null ? "" : txt).trim().replace(/[R$\s]/g, "");
+  if (!s) return 0;
+  if (s.indexOf(",") >= 0) s = s.replace(/\./g, "").replace(",", ".");
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+/* Texto normalizado para comparar estabelecimento: sem acento, sem
+   pontuacao, sem palavra de maquininha. E a base da conciliacao. */
+const LIXO_ESTABELECIMENTO = /\b(ltda|me|epp|sa|s\/a|eireli|comercio|com|ind|industria|mercado pago|mercadopago|pagseguro|pag|cielo|rede|getnet|stone|sumup|pix|ted|doc|debito|credito|compra|cartao|parc|parcela|\d{2}\/\d{2})\b/g;
+function normalizarTexto(txt) {
+  return String(txt || "")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(LIXO_ESTABELECIMENTO, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/* Codigo curto e SEM ACENTO para virar nome de pasta no Dropbox
+   (Dropbox-API-Arg e cabecalho HTTP: so ASCII) e etiqueta na tela. */
+function paraCodigo(txt) {
+  return String(txt || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+}
+
+async function sha256Hex(texto) {
+  const enc = new TextEncoder().encode(texto);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+const inputStyle = { background: "var(--superficie)", border: "1px solid var(--borda)", color: "var(--texto)" };
+
+/* ===========================================================
+   ARMAZENAMENTO LOCAL
+   Serve de copia rapida: o app abre com o que ja estava aqui e
+   so libera o lancamento quando o arquivo do Dropbox chega.
+=========================================================== */
+const LS_KEYS = {
+  dados:   "prumo_dados",
+  config:  "prumo_config",
+  cacheIa: "prumo_cache_leitura_ia"
+};
+
+function lsGet(key) {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; }
+  catch (e) { return null; }
+}
+function lsSet(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch (e) { return false; }
+}
+
+
+/* ===========================================================
+   DROPBOX — OAuth2 com PKCE, escopo "App folder".
+   Funciona em qualquer navegador, inclusive no celular. Nao ha
+   client secret no fluxo PKCE, entao a App Key pode ficar a
+   vista sem expor nada.
+   O Dropbox NAO EXECUTA NADA aqui: e so armazenamento.
+=========================================================== */
+const LS_DROPBOX = {
+  appKey:       "prumo_dropbox_app_key",
+  accessToken:  "prumo_dropbox_access_token",
+  refreshToken: "prumo_dropbox_refresh_token",
+  expiraEm:     "prumo_dropbox_expira_em",
+  verifier:     "prumo_dropbox_pkce_verifier" // so durante o login, apagado depois
+};
+
+const NOME_ARQUIVO_DROPBOX = "/prumo-dados.json";
+const PASTA_ENTRADA_DBX  = "/ENTRADA";
+const PASTA_LANCADOS_DBX = "/LANCADOS";
+
+/* A App Key do app novo do Dropbox entra aqui assim que existir.
+   Enquanto estiver vazia, o app pede a chave nas Configuracoes e
+   guarda no navegador. */
+const DROPBOX_APP_KEY_PADRAO = "";
+try {
+  if (DROPBOX_APP_KEY_PADRAO && !localStorage.getItem(LS_DROPBOX.appKey)) {
+    localStorage.setItem(LS_DROPBOX.appKey, DROPBOX_APP_KEY_PADRAO);
+  }
+} catch (e) { /* navegador sem localStorage: segue sem travar */ }
+
+function dropboxAppKeyAtual() {
+  try { return localStorage.getItem(LS_DROPBOX.appKey) || DROPBOX_APP_KEY_PADRAO || ""; }
+  catch (e) { return DROPBOX_APP_KEY_PADRAO || ""; }
+}
+
+function dropboxGerarVerifier() {
+  const bytes = new Uint8Array(64);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+async function dropboxDesafioPKCE(verifier) {
+  const data = new TextEncoder().encode(verifier);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return btoa(String.fromCharCode.apply(null, new Uint8Array(hash))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+/* SEMPRE a pasta do app, nunca o arquivo. O endereco de retorno tem
+   que bater EXATAMENTE com o cadastrado no app do Dropbox. Quando o
+   app roda em .../PRUMO/app.html, devolver o caminho com "app.html"
+   no fim faz o Dropbox recusar a autorizacao. O carregador
+   (index.html) repassa o ?code=... para o app.html. */
+function dropboxRedirectUri() {
+  const pasta = window.location.pathname.replace(/[^\/]*$/, "");
+  return window.location.origin + pasta;
+}
+
+async function dropboxIniciarLogin(appKey) {
+  const verifier = dropboxGerarVerifier();
+  localStorage.setItem(LS_DROPBOX.verifier, verifier);
+  localStorage.setItem(LS_DROPBOX.appKey, appKey);
+  const challenge = await dropboxDesafioPKCE(verifier);
+  const params = new URLSearchParams({
+    client_id: appKey,
+    response_type: "code",
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    token_access_type: "offline",
+    redirect_uri: dropboxRedirectUri()
+  });
+  window.location.href = "https://www.dropbox.com/oauth2/authorize?" + params.toString();
+}
+
+async function dropboxTrocarCodigoPorToken(code) {
+  const appKey = dropboxAppKeyAtual();
+  const verifier = localStorage.getItem(LS_DROPBOX.verifier);
+  if (!appKey || !verifier) return false;
+  const params = new URLSearchParams({
+    code: code, grant_type: "authorization_code", client_id: appKey,
+    code_verifier: verifier, redirect_uri: dropboxRedirectUri()
+  });
+  const resp = await fetch("https://api.dropboxapi.com/oauth2/token", {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: params.toString()
+  });
+  if (!resp.ok) return false;
+  const dados = await resp.json();
+  localStorage.setItem(LS_DROPBOX.accessToken, dados.access_token);
+  if (dados.refresh_token) localStorage.setItem(LS_DROPBOX.refreshToken, dados.refresh_token);
+  localStorage.setItem(LS_DROPBOX.expiraEm, String(Date.now() + (dados.expires_in - 60) * 1000));
+  localStorage.removeItem(LS_DROPBOX.verifier);
+  return true;
+}
+
+async function dropboxRenovarToken() {
+  const appKey = dropboxAppKeyAtual();
+  const refreshToken = localStorage.getItem(LS_DROPBOX.refreshToken);
+  if (!appKey || !refreshToken) return false;
+  const params = new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: appKey });
+  const resp = await fetch("https://api.dropboxapi.com/oauth2/token", {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: params.toString()
+  });
+  if (!resp.ok) return false;
+  const dados = await resp.json();
+  localStorage.setItem(LS_DROPBOX.accessToken, dados.access_token);
+  localStorage.setItem(LS_DROPBOX.expiraEm, String(Date.now() + (dados.expires_in - 60) * 1000));
+  return true;
+}
+
+async function dropboxTokenValido() {
+  const expiraEm = Number(localStorage.getItem(LS_DROPBOX.expiraEm) || 0);
+  if (Date.now() < expiraEm) return localStorage.getItem(LS_DROPBOX.accessToken);
+  const ok = await dropboxRenovarToken();
+  return ok ? localStorage.getItem(LS_DROPBOX.accessToken) : null;
+}
+function dropboxEstaConectado() {
+  try { return !!localStorage.getItem(LS_DROPBOX.refreshToken); } catch (e) { return false; }
+}
+function dropboxDesconectar() {
+  Object.keys(LS_DROPBOX).forEach((k) => {
+    if (k !== "appKey") localStorage.removeItem(LS_DROPBOX[k]);
+  });
+}
+
+/* O cabecalho Dropbox-API-Arg viaja como cabecalho HTTP, e cabecalho
+   HTTP so aceita ASCII. Um arquivo com "cartao de credito" acentuado
+   quebra a requisicao inteira e o documento parece corrompido. A
+   propria Dropbox manda escapar tudo acima de 0x7F em \uXXXX. */
+function dropboxArg(obj) {
+  return JSON.stringify(obj).replace(/[\u007f-\uffff]/g, function (ch) {
+    return "\\u" + ("000" + ch.charCodeAt(0).toString(16)).slice(-4);
+  });
+}
+
+async function dropboxLerDados() {
+  const token = await dropboxTokenValido();
+  if (!token) throw new Error("SEM_TOKEN");
+  const resp = await fetch("https://content.dropboxapi.com/2/files/download", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Dropbox-API-Arg": dropboxArg({ path: NOME_ARQUIVO_DROPBOX }) }
+  });
+  if (resp.status === 409) return null; // ainda nao existe: normal na primeira conexao
+  if (!resp.ok) throw new Error("FALHA_LEITURA");
+  const texto = await resp.text();
+  return texto ? JSON.parse(texto) : null;
+}
+
+async function dropboxEscreverDados(dados) {
+  const token = await dropboxTokenValido();
+  if (!token) throw new Error("SEM_TOKEN");
+  const resp = await fetch("https://content.dropboxapi.com/2/files/upload", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + token,
+      "Dropbox-API-Arg": dropboxArg({ path: NOME_ARQUIVO_DROPBOX, mode: "overwrite", mute: true }),
+      "Content-Type": "application/octet-stream"
+    },
+    body: JSON.stringify(dados)
+  });
+  if (!resp.ok) throw new Error("FALHA_ESCRITA");
+}
+
+async function dropboxRpc(endpoint, corpo) {
+  const token = await dropboxTokenValido();
+  if (!token) throw new Error("SEM_TOKEN");
+  const resp = await fetch("https://api.dropboxapi.com/2/" + endpoint, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify(corpo)
+  });
+  if (resp.status === 401 || resp.status === 403) {
+    const t = await resp.text();
+    if (/scope/i.test(t)) throw new Error("SEM_PERMISSAO_LISTAR");
+    throw new Error("SEM_TOKEN");
+  }
+  if (!resp.ok) {
+    const t = await resp.text();
+    if (/not_found/.test(t)) return null;
+    throw new Error("FALHA_DROPBOX: " + t.slice(0, 120));
+  }
+  return resp.json();
+}
+
+/* Cria a caixa de entrada e uma pasta por conta cadastrada.
+   O nome da pasta e o CODIGO da conta (PF-ITAU, PJ-BB...), sempre
+   ASCII, porque Dropbox-API-Arg e cabecalho HTTP.
+   Voce joga o arquivo na pasta do banco e o app ja sabe de quem e;
+   se jogar na /ENTRADA solta, o app descobre pelo conteudo. */
+async function dropboxGarantirPastas(codigos) {
+  const alvos = [PASTA_ENTRADA_DBX, PASTA_LANCADOS_DBX];
+  (codigos || []).forEach(c => { if (c) alvos.push(PASTA_ENTRADA_DBX + "/" + c); });
+  for (const p of alvos) {
+    try { await dropboxRpc("files/create_folder_v2", { path: p, autorename: false }); }
+    catch (e) { /* ja existe: tudo bem */ }
+  }
+  return alvos;
+}
+
+
+/* ===========================================================
+   DADOS — envelope unico gravado no Dropbox.
+   { versao, lancamentos, contas, cartoes, categorias,
+     recorrentes, config, salvoEm }
+   O "config" carrega as credenciais de proposito: localStorage e
+   por origem e cada versao nova ganha armazenamento proprio, entao
+   a chave da API volta pelo arquivo do Dropbox.
+   A chave da Anthropic NUNCA e escrita no codigo — o repositorio
+   do GitHub Pages e publico.
+=========================================================== */
+
+const CORES_CAT = ["#FF1B4C","#FF7A00","#FFC107","#22C55E","#14B8A6","#38BDF8",
+                   "#6366F1","#A855F7","#EC4899","#94A3B8","#F97316","#84CC16",
+                   "#0EA5E9","#F43F5E","#8B5CF6","#10B981","#EAB308","#64748B"];
+
+const CATEGORIAS_PADRAO = [
+  { nome: "Mercado",           tipo: "despesa", repetitiva: true  },
+  { nome: "Combustível",       tipo: "despesa", repetitiva: true  },
+  { nome: "Saúde",             tipo: "despesa", repetitiva: false },
+  { nome: "Casa / Moradia",    tipo: "despesa", repetitiva: false },
+  { nome: "Contas fixas",      tipo: "despesa", repetitiva: false },
+  { nome: "Educação",          tipo: "despesa", repetitiva: false },
+  { nome: "Transporte",        tipo: "despesa", repetitiva: true  },
+  { nome: "Alimentação fora",  tipo: "despesa", repetitiva: true  },
+  { nome: "Lazer",             tipo: "despesa", repetitiva: true  },
+  { nome: "Vestuário",         tipo: "despesa", repetitiva: false },
+  { nome: "Pets",              tipo: "despesa", repetitiva: false },
+  { nome: "Financiamentos",    tipo: "despesa", repetitiva: false },
+  { nome: "Impostos e taxas",  tipo: "despesa", repetitiva: false },
+  { nome: "Outros",            tipo: "despesa", repetitiva: false },
+  { nome: "Salário",             tipo: "receita", repetitiva: false },
+  { nome: "Pró-labore",          tipo: "receita", repetitiva: false },
+  { nome: "Retirada da empresa", tipo: "receita", repetitiva: false },
+  { nome: "Extras",              tipo: "receita", repetitiva: true  }
+];
+
+function categoriasIniciais() {
+  return CATEGORIAS_PADRAO.map((c, i) => ({
+    id: "cat-" + i, nome: c.nome, tipo: c.tipo,
+    repetitiva: c.repetitiva, cor: CORES_CAT[i % CORES_CAT.length], ativa: true
+  }));
+}
+
+const FORMAS = [
+  { id: "dinheiro",      rotulo: "Dinheiro",      usaConta: false, usaCartao: false },
+  { id: "pix",           rotulo: "Pix",           usaConta: true,  usaCartao: false },
+  { id: "debito",        rotulo: "Débito",        usaConta: true,  usaCartao: false },
+  { id: "transferencia", rotulo: "Transferência", usaConta: true,  usaCartao: false },
+  { id: "boleto",        rotulo: "Boleto",        usaConta: true,  usaCartao: false },
+  { id: "credito",       rotulo: "Cartão de crédito", usaConta: false, usaCartao: true }
+];
+const formaPorId = (id) => FORMAS.filter(f => f.id === id)[0] || FORMAS[0];
+
+/* PF e PJ do mesmo titular. Toda conta e todo cartao carrega a
+   titularidade, e o lancamento herda dela — e assim que sai o
+   sintetico separado sem ninguem ter que marcar nada na mao. */
+const TITULARIDADES = [
+  { id: "PF", rotulo: "Pessoa física" },
+  { id: "PJ", rotulo: "Pessoa jurídica" }
+];
+
+function envelopeVazio() {
+  return {
+    versao: 2,
+    lancamentos: [],
+    contas: [],
+    cartoes: [],
+    contratos: [],   // financiamentos, emprestimos, consorcios
+    aplicacoes: [],  // investimentos, atualizados por print da tela
+    coberturas: [],  // que pedaco de extrato de cada conta ja entrou
+    categorias: categoriasIniciais(),
+    recorrentes: [],
+    config: { apiKey: "", nome: "" },
+    salvoEm: null
+  };
+}
+
+/* Aceita qualquer arquivo antigo ou incompleto sem quebrar. */
+function normalizarEnvelope(bruto) {
+  const base = envelopeVazio();
+  if (!bruto || typeof bruto !== "object") return base;
+  const arr = (x) => (Array.isArray(x) ? x : []);
+  // Conta e cartao de arquivo antigo entram como PF, que era o unico caso.
+  const contas = arr(bruto.contas).map(c => Object.assign({ titularidade: "PF" }, c,
+    { codigo: c.codigo || paraCodigo((c.titularidade || "PF") + "-" + (c.banco || c.nome || "CONTA")) }));
+  const cartoes = arr(bruto.cartoes).map(c => Object.assign({ titularidade: "PF" }, c));
+  return {
+    versao: 2,
+    lancamentos: arr(bruto.lancamentos),
+    contas: contas,
+    cartoes: cartoes,
+    /* Contrato sem tabela de parcelas (importado, ou vindo de um
+       arquivo antigo) tem a tabela montada na hora — senao ele
+       apareceria como "quitado, faltam 0". */
+    contratos: arr(bruto.contratos).map(c => (c.parcelas && c.parcelas.length)
+      ? c
+      : Object.assign({}, c, { parcelas: gerarParcelas(c, []).parcelas })),
+    aplicacoes: arr(bruto.aplicacoes),
+    coberturas: arr(bruto.coberturas),
+    categorias: arr(bruto.categorias).length ? arr(bruto.categorias) : base.categorias,
+    recorrentes: arr(bruto.recorrentes),
+    config: Object.assign({}, base.config, bruto.config || {}),
+    salvoEm: bruto.salvoEm || null
+  };
+}
+
+/* ===========================================================
+   DUPLICIDADE — o erro mais caro do app de fretes (R$ 11.500
+   lancados duas vezes). Aqui o risco e maior ainda: a mesma
+   compra chega pela foto do comprovante E pela linha do extrato.
+   Tres camadas, todas obrigatorias desde a v1:
+   1) o botao de lancar so liga quando o dataset ja chegou;
+   2) segunda checagem no ato de lancar, contra o estado atual;
+   3) regra de negocio forte, alem do hash do arquivo.
+=========================================================== */
+
+/* Chave de negocio: tipo + data + valor + estabelecimento normalizado. */
+function chaveNegocio(l) {
+  return [
+    l.tipo || "despesa",
+    l.data || "",
+    (Number(l.valor) || 0).toFixed(2),
+    normalizarTexto(l.estabelecimento || l.descricao || "")
+  ].join("|");
+}
+
+function diasEntre(a, b) {
+  const da = new Date(a + "T12:00:00"), db = new Date(b + "T12:00:00");
+  if (isNaN(da) || isNaN(db)) return 999;
+  return Math.round(Math.abs(da - db) / 86400000);
+}
+
+/* Candidatos a duplicata de UM lancamento novo contra a lista atual.
+   Regra do briefing: data +-3 dias, valor exato, estabelecimento
+   normalizado igual ou contido. Nunca decide sozinho — devolve para
+   o app pedir confirmacao. */
+function procurarPossivelDuplicado(lista, novo) {
+  const valorNovo = (Number(novo.valor) || 0).toFixed(2);
+  const estNovo = normalizarTexto(novo.estabelecimento || novo.descricao || "");
+  const achados = [];
+  for (const l of lista) {
+    if (l.id && novo.id && l.id === novo.id) continue;
+    if ((Number(l.valor) || 0).toFixed(2) !== valorNovo) continue;
+    if ((l.tipo || "despesa") !== (novo.tipo || "despesa")) continue;
+    const dist = diasEntre(l.data, novo.data);
+    if (dist > 3) continue;
+
+    // identificador unico do banco (OFX): casamento certo, sem duvida
+    const fitidIgual = !!(l.origemRef && novo.origemRef && l.origemRef.fitid &&
+                          l.origemRef.fitid === novo.origemRef.fitid);
+    const hashIgual = !!(l.origemRef && novo.origemRef && l.origemRef.hash &&
+                         l.origemRef.hash === novo.origemRef.hash);
+
+    const estL = normalizarTexto(l.estabelecimento || l.descricao || "");
+    const textoBate = !!estNovo && !!estL &&
+      (estL === estNovo || estL.indexOf(estNovo) >= 0 || estNovo.indexOf(estL) >= 0);
+
+    let forca = 0;
+    if (fitidIgual || hashIgual) forca = 3;                 // certeza
+    else if (textoBate && dist === 0) forca = 2;            // muito provavel
+    else if (textoBate) forca = 1;                          // provavel
+    else if (dist === 0 && (l.origem || "") !== (novo.origem || "")) forca = 1; // foto x extrato
+    if (forca > 0) achados.push({ lancamento: l, forca: forca, dias: dist });
+  }
+  return achados.sort((a, b) => b.forca - a.forca);
+}
+
+/* Qual registro fica, quando dois sao a mesma coisa: o mais completo. */
+function pontuacaoParaFicar(l, categorias) {
+  let p = 0;
+  if (l.categoria) p += 3;
+  if (l.contaId || l.cartaoId) p += 2;
+  if (l.estabelecimento) p += 2;
+  if (l.descricao) p += 1;
+  if (l.origemRef && l.origemRef.fitid) p += 3;   // veio do OFX: dado do banco
+  if (l.origemRef && l.origemRef.arquivo) p += 2; // tem documento junto
+  if (l.origem === "extrato" || l.origem === "fatura") p += 1;
+  return p;
+}
+
+/* Varredura completa da base, para a tela "Procurar duplicados". */
+function acharDuplicados(lancamentos, categorias) {
+  const catPorId = {};
+  (categorias || []).forEach(c => { catPorId[c.id] = c; });
+  const grupos = [];
+  const jaAgrupado = {};
+
+  for (let i = 0; i < lancamentos.length; i++) {
+    const a = lancamentos[i];
+    if (jaAgrupado[a.id]) continue;
+    const iguais = [a];
+    let forcaMax = 0;
+    for (let j = i + 1; j < lancamentos.length; j++) {
+      const b = lancamentos[j];
+      if (jaAgrupado[b.id]) continue;
+      const achados = procurarPossivelDuplicado([b], a);
+      if (achados.length) {
+        iguais.push(b);
+        jaAgrupado[b.id] = true;
+        forcaMax = Math.max(forcaMax, achados[0].forca);
+      }
+    }
+    if (iguais.length > 1) {
+      jaAgrupado[a.id] = true;
+      const ordenados = iguais.slice().sort((x, y) => {
+        const d = pontuacaoParaFicar(y, categorias) - pontuacaoParaFicar(x, categorias);
+        return d !== 0 ? d : String(x.criadoEm || "").localeCompare(String(y.criadoEm || ""));
+      });
+      // Item que repete por natureza (mercado, combustivel, refeicao) NUNCA
+      // vem pre-marcado: duas compras iguais no mesmo dia acontecem de verdade.
+      const cat = catPorId[ordenados[0].categoria];
+      const repetitiva = !!(cat && cat.repetitiva);
+      const preMarcar = forcaMax >= 3 || (forcaMax >= 2 && !repetitiva);
+      grupos.push({
+        id: "g-" + ordenados[0].id,
+        itens: ordenados,
+        fica: ordenados[0].id,
+        forca: forcaMax,
+        repetitiva: repetitiva,
+        preMarcar: preMarcar
+      });
+    }
+  }
+  return grupos;
+}
+
+/* ===========================================================
+   O ESTADO DO APP — carga, trava e gravacao
+=========================================================== */
+function useDados() {
+  const [dados, setDados] = useState(() => normalizarEnvelope(lsGet(LS_KEYS.dados)));
+  // dadosProntos = false trava TODO lancamento. Sem isso, a checagem
+  // de duplicidade compara contra lista vazia e duplica tudo.
+  const [dadosProntos, setDadosProntos] = useState(false);
+  const [statusCarga, setStatusCarga] = useState("iniciando");
+  const [statusSalvar, setStatusSalvar] = useState("");
+  const [erroCarga, setErroCarga] = useState("");
+  const timerRef = useRef(null);
+  const dadosRef = useRef(dados);
+  useEffect(() => { dadosRef.current = dados; }, [dados]);
+
+  const carregar = useCallback(async () => {
+    setErroCarga("");
+    if (!dropboxEstaConectado()) {
+      // Sem nuvem, o arquivo local E a fonte: nada a esperar.
+      setStatusCarga("local");
+      setDadosProntos(true);
+      return;
+    }
+    setStatusCarga("carregando");
+    setDadosProntos(false);
+    try {
+      const remoto = await dropboxLerDados();
+      if (remoto) {
+        const env = normalizarEnvelope(remoto);
+        setDados(env);
+        lsSet(LS_KEYS.dados, env);
+      }
+      setStatusCarga("nuvem");
+      setDadosProntos(true);
+    } catch (e) {
+      setStatusCarga("erro");
+      setErroCarga(traduzirErro(e));
+      setDadosProntos(false); // trava de proposito: nao lanca as cegas
+    }
+  }, []);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const gravarNuvem = useCallback(async (env) => {
+    if (!dropboxEstaConectado()) { setStatusSalvar("local"); return; }
+    setStatusSalvar("salvando");
+    try {
+      await dropboxEscreverDados(env);
+      setStatusSalvar("salvo");
+    } catch (e) {
+      setStatusSalvar("erro");
+    }
+  }, []);
+
+  // Toda alteracao passa por aqui: grava local na hora e agenda a nuvem.
+  const alterar = useCallback((fn) => {
+    setDados((atual) => {
+      const bruto = typeof fn === "function" ? fn(atual) : fn;
+      const env = Object.assign({}, bruto, { salvoEm: new Date().toISOString() });
+      lsSet(LS_KEYS.dados, env);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => { gravarNuvem(env); }, 1200);
+      return env;
+    });
+  }, [gravarNuvem]);
+
+  const salvarAgora = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    return gravarNuvem(dadosRef.current);
+  }, [gravarNuvem]);
+
+  return { dados, alterar, dadosProntos, statusCarga, statusSalvar, erroCarga, recarregar: carregar, salvarAgora };
+}
+
+/* Erros da API e do Dropbox em portugues de gente. */
+function traduzirErro(e) {
+  const m = String((e && e.message) || e || "");
+  if (/SEM_TOKEN/.test(m)) return "A conexão com o Dropbox expirou. Conecte de novo nas Configurações.";
+  if (/SEM_PERMISSAO_LISTAR/.test(m)) return "O app do Dropbox está sem a permissão de ler a pasta. Marque files.content.read e files.content.write e conecte de novo.";
+  if (/SEM_CHAVE_API/.test(m)) return "Falta a chave da API da Anthropic nas Configurações.";
+  if (/FALHA_LEITURA/.test(m)) return "Não consegui ler o arquivo no Dropbox.";
+  if (/FALHA_ESCRITA/.test(m)) return "Não consegui gravar no Dropbox.";
+  if (/FORMATO_HEIC/.test(m)) return "Foto em HEIC do iPhone. Mude a câmera para “Mais compatível” ou mande em JPEG.";
+  if (/FORMATO_NAO_SUPORTADO/.test(m)) return "Formato de arquivo não aceito. Use JPEG, PNG, WEBP ou PDF.";
+  if (/ERRO_API: 401/.test(m)) return "A chave da API foi recusada (401). Confira a chave nas Configurações.";
+  if (/ERRO_API: 429/.test(m)) return "A API está com limite de uso atingido (429). Espere um pouco e tente de novo.";
+  if (/ERRO_API: 5/.test(m)) return "A API da Anthropic está fora do ar no momento. Tente daqui a pouco.";
+  if (/Failed to fetch|NetworkError/i.test(m)) return "Sem internet ou conexão bloqueada.";
+  return m || "Erro desconhecido.";
+}
+
+
+/* ===========================================================
+   BANCO A BANCO — saldo, extrato com saldo em cada linha,
+   e a conferencia que descobre extrato parcial.
+=========================================================== */
+
+/* De quem e o lancamento: sai da conta ou do cartao, nunca de
+   uma marcacao a mao — assim o sintetico PF/PJ nunca desencontra. */
+function titularidadeDoLancamento(l, mapaContas, mapaCartoes) {
+  if (l.cartaoId && mapaCartoes[l.cartaoId]) return mapaCartoes[l.cartaoId].titularidade || "PF";
+  if (l.contaId && mapaContas[l.contaId]) return mapaContas[l.contaId].titularidade || "PF";
+  return l.titularidade || "PF";
+}
+
+function indexarPorId(lista) {
+  const m = {}; (lista || []).forEach(x => { m[x.id] = x; }); return m;
+}
+
+/* Efeito do lancamento no dinheiro DA CONTA.
+   Compra no cartao nao mexe na conta — quem mexe e o pagamento da
+   fatura. Por isso so entra o que tem contaId. */
+function efeitoNaConta(l) {
+  if (!l.contaId) return 0;
+  return (l.tipo === "receita" ? 1 : -1) * (Number(l.valor) || 0);
+}
+
+/* Extrato da conta com o saldo acumulado em CADA LINHA, partindo do
+   saldo inicial informado no cadastro (ou do saldo do primeiro
+   extrato importado). */
+function extratoDaConta(conta, lancamentos, ateData) {
+  const doBanco = (lancamentos || [])
+    .filter(l => l.contaId === conta.id)
+    .filter(l => !ateData || String(l.data) <= ateData)
+    .sort((a, b) => String(a.data).localeCompare(String(b.data)) ||
+                    (Number(a.ordem || 0) - Number(b.ordem || 0)) ||
+                    String(a.criadoEm || "").localeCompare(String(b.criadoEm || "")));
+  let saldo = Number(conta.saldoInicial) || 0;
+  return doBanco.map(l => {
+    saldo += efeitoNaConta(l);
+    return Object.assign({}, l, { saldo: saldo });
+  });
+}
+
+function saldoDaConta(conta, lancamentos, ateData) {
+  const linhas = extratoDaConta(conta, lancamentos, ateData);
+  return linhas.length ? linhas[linhas.length - 1].saldo : (Number(conta.saldoInicial) || 0);
+}
+
+/* ===========================================================
+   COBERTURA DE EXTRATO — o que responde "esse extrato e parcial?"
+   Cada importacao grava o periodo, o saldo inicial e o saldo final
+   que o proprio banco declara. Duas conferencias saem daqui:
+   1) FURO: falta pedaco entre um extrato e o seguinte;
+   2) INCOMPLETO: o saldo final declarado nao bate com o saldo
+      inicial mais a soma das linhas — entao vieram linhas de menos.
+=========================================================== */
+function diaSeguinte(iso) {
+  const d = new Date(String(iso) + "T12:00:00");
+  if (isNaN(d)) return iso;
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function conferirCobertura(cob) {
+  const ini = Number(cob.saldoIni) || 0;
+  const fim = Number(cob.saldoFim);
+  const somaLinhas = Number(cob.somaLinhas) || 0;
+  if (cob.saldoFim == null || isNaN(fim)) {
+    return { completo: null, diferenca: 0, texto: "o extrato não declara o saldo final — não dá para conferir" };
+  }
+  const diferenca = Math.round((ini + somaLinhas - fim) * 100) / 100;
+  if (Math.abs(diferenca) < 0.005) return { completo: true, diferenca: 0, texto: "confere: saldo inicial + lançamentos = saldo final" };
+  return {
+    completo: false, diferenca: diferenca,
+    texto: "faltam lançamentos: sobra " + currency(Math.abs(diferenca)) + " de diferença entre o que veio e o saldo final do banco"
+  };
+}
+
+/* Furos entre os extratos ja importados de uma conta. */
+function furosDaConta(contaId, coberturas) {
+  const lista = (coberturas || [])
+    .filter(c => c.contaId === contaId && c.ini && c.fim)
+    .sort((a, b) => String(a.ini).localeCompare(String(b.ini)));
+  const furos = [];
+  for (let i = 1; i < lista.length; i++) {
+    const fimAnterior = lista[i - 1].fim;
+    const iniAtual = lista[i].ini;
+    if (diaSeguinte(fimAnterior) < iniAtual) {
+      furos.push({ de: diaSeguinte(fimAnterior), ate: String(new Date(new Date(iniAtual + "T12:00:00").getTime() - 86400000).toISOString().slice(0, 10)) });
+    }
+    // saldo final de um tem que ser o saldo inicial do proximo
+    const sf = lista[i - 1].saldoFim, si = lista[i].saldoIni;
+    if (sf != null && si != null && Math.abs(Number(sf) - Number(si)) > 0.005 && diaSeguinte(fimAnterior) === iniAtual) {
+      furos.push({ de: fimAnterior, ate: iniAtual, saldoPula: Math.round((Number(si) - Number(sf)) * 100) / 100 });
+    }
+  }
+  return furos;
+}
+
+function coberturaDaConta(contaId, coberturas) {
+  const lista = (coberturas || []).filter(c => c.contaId === contaId).sort((a, b) => String(a.ini).localeCompare(String(b.ini)));
+  if (!lista.length) return null;
+  return { de: lista[0].ini, ate: lista[lista.length - 1].fim, quantos: lista.length };
+}
+
+/* ===========================================================
+   CONTRATOS — financiamento, emprestimo, consorcio.
+   Tabela Price gerada a partir de valor, prazo e taxa. Quando a
+   taxa nao vem no contrato, ela e descoberta pela parcela.
+=========================================================== */
+function parcelaPrice(valor, taxaMes, n) {
+  const i = (Number(taxaMes) || 0) / 100;
+  if (!n) return 0;
+  if (i <= 0) return valor / n;
+  return valor * i / (1 - Math.pow(1 + i, -n));
+}
+
+/* Acha a taxa mensal a partir da parcela, por bisseccao — serve
+   quando o contrato so informa valor, prazo e prestacao. */
+function taxaPelaParcela(valor, parcela, n) {
+  if (!valor || !parcela || !n) return 0;
+  if (parcela * n <= valor) return 0;
+  let lo = 0, hi = 20; // 0% a 20% ao mes
+  for (let k = 0; k < 200; k++) {
+    const mid = (lo + hi) / 2;
+    if (parcelaPrice(valor, mid, n) > parcela) hi = mid; else lo = mid;
+  }
+  return Math.round(((lo + hi) / 2) * 10000) / 10000;
+}
+
+function somarMeses(iso, meses, dia) {
+  const [a, m, d] = String(iso).split("-").map(Number);
+  const base = new Date(a, (m - 1) + meses, 1);
+  const diaAlvo = dia || d || 1;
+  const ultimo = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+  base.setDate(Math.min(diaAlvo, ultimo));
+  return base.getFullYear() + "-" + String(base.getMonth() + 1).padStart(2, "0") + "-" + String(base.getDate()).padStart(2, "0");
+}
+
+/* Gera as parcelas preservando o que ja foi baixado. */
+function gerarParcelas(contrato, parcelasAtuais) {
+  const n = Number(contrato.prazoMeses) || 0;
+  const valor = Number(contrato.valorFinanciado) || 0;
+  let taxa = Number(contrato.taxaMes) || 0;
+  const parcelaInformada = Number(contrato.valorParcela) || 0;
+  if (!taxa && parcelaInformada) taxa = taxaPelaParcela(valor, parcelaInformada, n);
+  const p = parcelaInformada || parcelaPrice(valor, taxa, n);
+  const i = taxa / 100;
+  const antigas = {};
+  (parcelasAtuais || []).forEach(x => { antigas[x.n] = x; });
+
+  let saldo = valor;
+  const out = [];
+  for (let k = 1; k <= n; k++) {
+    const juros = Math.round(saldo * i * 100) / 100;
+    let amort = Math.round((p - juros) * 100) / 100;
+    if (k === n) amort = Math.round(saldo * 100) / 100;
+    saldo = Math.round((saldo - amort) * 100) / 100;
+    const velha = antigas[k] || {};
+    out.push({
+      n: k,
+      vencimento: somarMeses(contrato.dataInicio || dataHojeISO(), k, Number(contrato.diaVencimento) || 0),
+      valor: Math.round((k === n ? amort + juros : p) * 100) / 100,
+      juros: juros,
+      amortizacao: amort,
+      saldoDevedor: Math.max(0, saldo),
+      pago: !!velha.pago,
+      dataPagamento: velha.dataPagamento || "",
+      valorPago: velha.valorPago || 0,
+      lancamentoId: velha.lancamentoId || ""
+    });
+  }
+  return { parcelas: out, taxaUsada: taxa, parcelaUsada: p };
+}
+
+function resumoContrato(contrato) {
+  const ps = contrato.parcelas || [];
+  const pagas = ps.filter(x => x.pago);
+  const abertas = ps.filter(x => !x.pago);
+  const hoje = dataHojeISO();
+  const vencidas = abertas.filter(x => x.vencimento < hoje);
+  const proxima = abertas.slice().sort((a, b) => String(a.vencimento).localeCompare(String(b.vencimento)))[0] || null;
+  const totalPago = pagas.reduce((s, x) => s + (Number(x.valorPago) || Number(x.valor) || 0), 0);
+  const totalContrato = ps.reduce((s, x) => s + (Number(x.valor) || 0), 0);
+  const saldoDevedor = proxima ? (Number(proxima.saldoDevedor) || 0) + (Number(proxima.amortizacao) || 0)
+                               : (ps.length ? 0 : Number(contrato.valorFinanciado) || 0);
+  const taxaMes = Number(contrato.taxaMes) || 0;
+  return {
+    total: ps.length,
+    pagas: pagas.length,
+    faltam: abertas.length,
+    vencidas: vencidas.length,
+    totalPago: totalPago,
+    totalContrato: totalContrato,
+    aPagar: totalContrato - totalPago,
+    saldoDevedor: saldoDevedor,
+    proxima: proxima,
+    inicio: ps.length ? ps[0].vencimento : (contrato.dataInicio || ""),
+    fim: ps.length ? ps[ps.length - 1].vencimento : "",
+    taxaMes: taxaMes,
+    taxaAno: taxaMes ? Math.round((Math.pow(1 + taxaMes / 100, 12) - 1) * 10000) / 100 : 0
+  };
+}
+
+/* ===========================================================
+   APLICACOES — o saldo entra por print da tela do banco; aqui
+   fica so o historico, para dar a variacao.
+=========================================================== */
+function saldoAplicacao(ap) {
+  const h = (ap.historico || []).slice().sort((a, b) => String(b.data).localeCompare(String(a.data)));
+  return h.length ? Number(h[0].valor) || 0 : 0;
+}
+function dataSaldoAplicacao(ap) {
+  const h = (ap.historico || []).slice().sort((a, b) => String(b.data).localeCompare(String(a.data)));
+  return h.length ? h[0].data : "";
+}
+function variacaoAplicacao(ap) {
+  const h = (ap.historico || []).slice().sort((a, b) => String(b.data).localeCompare(String(a.data)));
+  if (h.length < 2) return null;
+  const atual = Number(h[0].valor) || 0, antes = Number(h[1].valor) || 0;
+  return { valor: atual - antes, pct: antes ? ((atual - antes) / antes) * 100 : null, de: h[1].data };
+}
+
+
+/* ===========================================================
+   PECAS DE TELA
+=========================================================== */
+function Campo({ label, children, dica }) {
+  return (
+    <label className="block">
+      <span className="block text-[11px] uppercase tracking-wide mb-1" style={{ color: "var(--suave)" }}>{label}</span>
+      {children}
+      {dica ? <span className="block text-[11px] mt-1" style={{ color: "var(--suave)" }}>{dica}</span> : null}
+    </label>
+  );
+}
+
+function Entrada(props) {
+  return <input {...props} className={"w-full rounded-md px-3 py-2 text-sm outline-none " + (props.className || "")} style={Object.assign({}, inputStyle, props.style || {})} />;
+}
+function Selecao(props) {
+  return <select {...props} className={"w-full rounded-md px-3 py-2 text-sm outline-none " + (props.className || "")} style={Object.assign({}, inputStyle, props.style || {})}>{props.children}</select>;
+}
+
+function Botao({ children, onClick, tom = "acento", disabled, titulo, tipo = "button", className = "" }) {
+  const fundo = tom === "acento" ? "var(--acento)" : tom === "perigo" ? "var(--perigo)" : "var(--superficie)";
+  const cor   = tom === "neutro" ? "var(--texto)" : "#FFFFFF";
+  return (
+    <button type={tipo} onClick={onClick} disabled={disabled} title={titulo}
+      className={"inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-opacity " + className}
+      style={{ background: fundo, color: cor, border: tom === "neutro" ? "1px solid var(--borda)" : "0",
+               opacity: disabled ? 0.45 : 1, cursor: disabled ? "not-allowed" : "pointer" }}>
+      {children}
+    </button>
+  );
+}
+
+function Cartao({ children, className = "", style = {} }) {
+  return (
+    <div className={"rounded-lg " + className}
+         style={Object.assign({ background: "var(--superficie)", border: "1px solid var(--borda)" }, style)}>
+      {children}
+    </div>
+  );
+}
+
+function StatCard({ label, valor, icone: IconC, tom = "neutro", rodape }) {
+  const cor = tom === "ok" ? "var(--ok-claro)" : tom === "perigo" ? "var(--erro-claro)" : "var(--texto)";
+  return (
+    <div className="p-3" style={{ background: "var(--superficie)", border: "1px solid var(--borda)" }}>
+      <div className="flex items-center gap-1.5 mb-1" style={{ color: "var(--suave)" }}>
+        {IconC ? <IconC size={13} /> : null}
+        <span className="text-[10px] uppercase tracking-wider">{label}</span>
+      </div>
+      <div className="text-lg font-bold leading-tight" style={{ color: cor, fontFamily: "'JetBrains Mono', monospace" }}>{valor}</div>
+      {rodape ? <div className="text-[11px] mt-1" style={{ color: "var(--suave)" }}>{rodape}</div> : null}
+    </div>
+  );
+}
+
+function Vazio({ texto }) {
+  return (
+    <div className="text-center py-10 text-sm" style={{ color: "var(--suave)" }}>{texto}</div>
+  );
+}
+
+function Modal({ titulo, onClose, children, largura = 560 }) {
+  useEffect(() => {
+    const esc = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 no-print"
+         style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
+      <div className="w-full rounded-t-xl sm:rounded-xl overflow-hidden flex flex-col"
+           style={{ maxWidth: largura, maxHeight: "92vh", background: "var(--fundo)", border: "1px solid var(--borda)" }}
+           onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 shrink-0"
+             style={{ background: "var(--barra)", borderBottom: "1px solid var(--borda)" }}>
+          <h3 className="text-sm font-bold" style={{ color: "var(--na-barra)" }}>{titulo}</h3>
+          <button onClick={onClose} style={{ color: "var(--na-barra-suave)" }} aria-label="Fechar"><IconX size={20} /></button>
+        </div>
+        <div className="p-4 overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Faixa({ tom = "aviso", children }) {
+  const fundo = tom === "erro" ? "var(--erro-bg)" : "var(--aviso-bg)";
+  const borda = tom === "erro" ? "var(--erro-borda)" : "var(--aviso-borda)";
+  const cor   = tom === "erro" ? "var(--erro-txt)" : "var(--ouro-escuro)";
+  return (
+    <div className="flex items-start gap-2 rounded-md px-3 py-2 text-[13px] no-print"
+         style={{ background: fundo, border: "1px solid " + borda, color: cor }}>
+      <IconAlert size={15} className="shrink-0 mt-0.5" />
+      <div>{children}</div>
+    </div>
+  );
+}
+
+/* Confere se o arquivo publicado e mais novo que o que esta rodando.
+   Atualiza sozinho uma vez por sessao, com endereco carimbado — sem
+   isso um atalho salvo continua servindo a copia velha do cache. */
+function AvisoVersaoNova() {
+  const [nova, setNova] = useState(null);
+  useEffect(() => {
+    if (!/^https?:/.test(location.protocol)) return;
+    const alvo = location.origin + location.pathname;
+    fetch(alvo + "?checar=" + Date.now(), { cache: "no-store" })
+      .then(r => (r.ok ? r.text() : null))
+      .then(txt => {
+        if (!txt) return;
+        const m = txt.match(/APP_VERSION = "(v\d+)"/);
+        if (!m || m[1] === APP_VERSION) return;
+        setNova(m[1]);
+        try {
+          if (!sessionStorage.getItem("prumo_autoatualizou")) {
+            sessionStorage.setItem("prumo_autoatualizou", m[1]);
+            location.replace(alvo + "?v=" + m[1] + "." + Date.now());
+            return;
+          }
+        } catch (e) { /* sem sessionStorage: fica so o aviso com o botao */ }
+      })
+      .catch(() => {});
+  }, []);
+  if (!nova) return null;
+  return (
+    <div className="no-print" style={{ background: "var(--acento)", color: "var(--superficie)", padding: "8px 12px",
+                  display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 13 }}>
+      <span>Existe uma versão mais nova publicada ({nova}). Você está na {APP_VERSION}.</span>
+      <button onClick={() => { location.replace(location.origin + location.pathname + "?v=" + nova + "." + Date.now()); }}
+        style={{ background: "var(--barra)", color: "var(--superficie)", border: 0, borderRadius: 6,
+                 padding: "5px 12px", fontWeight: 700, cursor: "pointer" }}>
+        Atualizar agora
+      </button>
+    </div>
+  );
+}
+
+
+/* ===========================================================
+   SELETOR DE MES
+=========================================================== */
+function SeletorMes({ mes, onMes }) {
+  return (
+    <div className="flex items-center gap-1 no-print">
+      <button onClick={() => onMes(mesSomado(mes, -1))} title="Mês anterior"
+        className="px-2 py-1.5 rounded-md text-sm" style={{ background: "var(--superficie)", border: "1px solid var(--borda)", color: "var(--texto)" }}>‹</button>
+      <div className="px-3 py-1.5 rounded-md text-sm font-semibold text-center" style={{ minWidth: 150, background: "var(--superficie)", border: "1px solid var(--borda)" }}>
+        {mesPorExtenso(mes)}
+      </div>
+      <button onClick={() => onMes(mesSomado(mes, 1))} title="Próximo mês"
+        className="px-2 py-1.5 rounded-md text-sm" style={{ background: "var(--superficie)", border: "1px solid var(--borda)", color: "var(--texto)" }}>›</button>
+    </div>
+  );
+}
+
+/* ===========================================================
+   MODAL DE LANCAMENTO (digitacao manual — o gasto em dinheiro)
+   Traz a SEGUNDA checagem de duplicidade, feita no ato de
+   lancar contra o estado atual, e nunca decide sozinha.
+=========================================================== */
+function ModalLancamento({ inicial, dados, refLancamentos, dadosProntos, onSalvar, onExcluir, onClose }) {
+  const base = inicial || {};
+  const [tipo, setTipo] = useState(base.tipo || "despesa");
+  const [data, setData] = useState(base.data || dataHojeISO());
+  const [valor, setValor] = useState(base.valor != null ? String(base.valor).replace(".", ",") : "");
+  const [categoria, setCategoria] = useState(base.categoria || "");
+  const [estabelecimento, setEstabelecimento] = useState(base.estabelecimento || "");
+  const [forma, setForma] = useState(base.forma || "dinheiro");
+  const [contaId, setContaId] = useState(base.contaId || "");
+  const [cartaoId, setCartaoId] = useState(base.cartaoId || "");
+  const [descricao, setDescricao] = useState(base.descricao || "");
+  const [avisos, setAvisos] = useState([]);
+  const [candidatos, setCandidatos] = useState(null);
+
+  const editando = !!(inicial && inicial.id);
+  const cats = (dados.categorias || []).filter(c => c.tipo === tipo && c.ativa !== false);
+  const f = formaPorId(forma);
+
+  const montar = () => ({
+    id: editando ? inicial.id : uid(),
+    tipo: tipo,
+    data: data,
+    valor: paraNumero(valor),
+    categoria: categoria,
+    estabelecimento: estabelecimento.trim(),
+    descricao: descricao.trim(),
+    forma: forma,
+    contaId: f.usaConta ? contaId : "",
+    cartaoId: f.usaCartao ? cartaoId : "",
+    origem: (inicial && inicial.origem) || "manual",
+    origemRef: (inicial && inicial.origemRef) || null,
+    criadoEm: (inicial && inicial.criadoEm) || new Date().toISOString(),
+    atualizadoEm: new Date().toISOString()
+  });
+
+  const validar = (l) => {
+    const e = [];
+    if (!l.data) e.push("Falta a data.");
+    if (!(l.valor > 0)) e.push("O valor tem que ser maior que zero.");
+    if (!l.categoria) e.push("Escolha a categoria.");
+    if (f.usaConta && !l.contaId && (dados.contas || []).length) e.push("Escolha a conta.");
+    if (f.usaCartao && !l.cartaoId) e.push((dados.cartoes || []).length ? "Escolha o cartão." : "Cadastre um cartão nas Configurações antes de lançar no crédito.");
+    return e;
+  };
+
+  const tentarSalvar = () => {
+    const l = montar();
+    const e = validar(l);
+    if (e.length) { setAvisos(e); return; }
+    setAvisos([]);
+    // SEGUNDA CHECAGEM: contra a lista de verdade, no instante do clique.
+    const lista = (refLancamentos && refLancamentos.current) || dados.lancamentos || [];
+    const achados = procurarPossivelDuplicado(lista, l);
+    if (achados.length && !editando) { setCandidatos({ novo: l, achados: achados }); return; }
+    onSalvar(l);
+  };
+
+  if (candidatos) {
+    return (
+      <Modal titulo="Isto já está lançado?" onClose={() => setCandidatos(null)}>
+        <div className="space-y-3">
+          <Faixa tom="aviso">
+            Achei {candidatos.achados.length === 1 ? "um lançamento parecido" : candidatos.achados.length + " lançamentos parecidos"}.
+            Confira antes de lançar — a mesma compra costuma chegar duas vezes (pela foto e pela linha do extrato).
+          </Faixa>
+          <div className="space-y-2">
+            {candidatos.achados.map((a) => (
+              <Cartao key={a.lancamento.id} className="p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">{a.lancamento.estabelecimento || a.lancamento.descricao || "(sem nome)"}</div>
+                    <div className="text-[11px]" style={{ color: "var(--suave)" }}>
+                      {dataCurta(a.lancamento.data)} · {a.dias === 0 ? "mesmo dia" : a.dias + " dia(s) de diferença"} · origem: {a.lancamento.origem || "manual"}
+                    </div>
+                  </div>
+                  <div className="text-sm font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(a.lancamento.valor)}</div>
+                </div>
+              </Cartao>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Botao tom="neutro" onClick={() => setCandidatos(null)}>Voltar e conferir</Botao>
+            <Botao tom="acento" onClick={() => { onSalvar(candidatos.novo); setCandidatos(null); }}>
+              <IconCheck size={15} /> É outro gasto, pode lançar
+            </Botao>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal titulo={editando ? "Editar lançamento" : "Novo lançamento"} onClose={onClose}>
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          {["despesa", "receita"].map(t => (
+            <button key={t} onClick={() => { setTipo(t); setCategoria(""); }}
+              className="flex-1 py-2 rounded-md text-sm font-semibold"
+              style={{
+                background: tipo === t ? "var(--selecionado-bg)" : "var(--superficie)",
+                color: tipo === t ? "var(--selecionado-txt)" : "var(--texto)",
+                border: "1px solid " + (tipo === t ? "var(--selecionado-bg)" : "var(--borda)")
+              }}>
+              {t === "despesa" ? "Saiu (despesa)" : "Entrou (receita)"}
+            </button>
+          ))}
+        </div>
+
+        <div className="grade-form">
+          <Campo label="Data"><Entrada type="date" value={data} onChange={(e) => setData(e.target.value)} /></Campo>
+          <Campo label="Valor (R$)"><Entrada inputMode="decimal" placeholder="0,00" value={valor} onChange={(e) => setValor(e.target.value)} /></Campo>
+        </div>
+
+        <Campo label="Categoria">
+          <Selecao value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+            <option value="">— escolha —</option>
+            {cats.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </Selecao>
+        </Campo>
+
+        <Campo label={tipo === "despesa" ? "Onde foi (estabelecimento)" : "De onde veio"}>
+          <Entrada value={estabelecimento} onChange={(e) => setEstabelecimento(e.target.value)}
+                   placeholder={tipo === "despesa" ? "Ex.: Supermercado Angeloni" : "Ex.: GVGS"} />
+        </Campo>
+
+        <div className="grade-form">
+          <Campo label="Forma">
+            <Selecao value={forma} onChange={(e) => setForma(e.target.value)}>
+              {FORMAS.map(x => <option key={x.id} value={x.id}>{x.rotulo}</option>)}
+            </Selecao>
+          </Campo>
+          {f.usaConta ? (
+            <Campo label="Conta">
+              <Selecao value={contaId} onChange={(e) => setContaId(e.target.value)}>
+                <option value="">— escolha —</option>
+                {(dados.contas || []).map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </Selecao>
+            </Campo>
+          ) : f.usaCartao ? (
+            <Campo label="Cartão">
+              <Selecao value={cartaoId} onChange={(e) => setCartaoId(e.target.value)}>
+                <option value="">— escolha —</option>
+                {(dados.cartoes || []).map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </Selecao>
+            </Campo>
+          ) : <div />}
+        </div>
+
+        <Campo label="Observação (opcional)">
+          <Entrada value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Uma linha para lembrar depois" />
+        </Campo>
+
+        {avisos.length ? <Faixa tom="erro">{avisos.map((a, i) => <div key={i}>{a}</div>)}</Faixa> : null}
+
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <Botao tom="acento" onClick={tentarSalvar} disabled={!dadosProntos}
+                 titulo={dadosProntos ? "" : "Esperando os lançamentos carregarem"}>
+            <IconCheck size={15} /> {dadosProntos ? (editando ? "Salvar" : "Lançar") : "Carregando lançamentos..."}
+          </Botao>
+          <Botao tom="neutro" onClick={onClose}>Cancelar</Botao>
+          {editando ? (
+            <Botao tom="perigo" className="ml-auto" onClick={() => onExcluir(inicial.id)}>
+              <IconTrash size={15} /> Excluir
+            </Botao>
+          ) : null}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ===========================================================
+   ABA RESUMO — quanto entrou, quanto saiu, o que sobrou,
+   e a despesa por categoria comparada com o mes anterior.
+=========================================================== */
+function AbaResumo({ dados, mes, onMes }) {
+  const [filtro, setFiltro] = useState("TUDO");
+  const catPorId = useMemo(() => {
+    const m = {}; (dados.categorias || []).forEach(c => { m[c.id] = c; }); return m;
+  }, [dados.categorias]);
+  const mapaContas = indexarPorId(dados.contas);
+  const mapaCartoes = indexarPorId(dados.cartoes);
+  const cabe = (l) => filtro === "TUDO" || titularidadeDoLancamento(l, mapaContas, mapaCartoes) === filtro;
+
+  const doMes = (mm) => (dados.lancamentos || []).filter(l => mesDaData(l.data) === mm).filter(cabe);
+  const atual = doMes(mes);
+  const anterior = doMes(mesSomado(mes, -1));
+
+  const soma = (lista, tipo) => lista.filter(l => (l.tipo || "despesa") === tipo)
+                                     .reduce((s, l) => s + (Number(l.valor) || 0), 0);
+  const entrou = soma(atual, "receita");
+  const saiu   = soma(atual, "despesa");
+  const sobrou = entrou - saiu;
+  const saiuAnterior = soma(anterior, "despesa");
+  const noCartao = atual.filter(l => l.cartaoId).reduce((s, l) => s + (Number(l.valor) || 0), 0);
+
+  const porCategoria = useMemo(() => {
+    const acc = {};
+    atual.filter(l => (l.tipo || "despesa") === "despesa").forEach(l => {
+      const k = l.categoria || "sem";
+      acc[k] = (acc[k] || 0) + (Number(l.valor) || 0);
+    });
+    const accAnt = {};
+    anterior.filter(l => (l.tipo || "despesa") === "despesa").forEach(l => {
+      const k = l.categoria || "sem";
+      accAnt[k] = (accAnt[k] || 0) + (Number(l.valor) || 0);
+    });
+    return Object.keys(acc).map(k => ({
+      id: k,
+      nome: (catPorId[k] && catPorId[k].nome) || "Sem categoria",
+      cor: (catPorId[k] && catPorId[k].cor) || "#64748B",
+      valor: acc[k],
+      antes: accAnt[k] || 0
+    })).sort((a, b) => b.valor - a.valor);
+  }, [atual, anterior, catPorId]);
+
+  const maior = porCategoria.length ? porCategoria[0].valor : 0;
+  const deltaMes = saiuAnterior > 0 ? ((saiu - saiuAnterior) / saiuAnterior) * 100 : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-base font-bold">
+          Resumo de {mesPorExtenso(mes)}{filtro === "TUDO" ? "" : " · " + filtro}
+        </h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <FiltroTitular valor={filtro} onValor={setFiltro} />
+          <SeletorMes mes={mes} onMes={onMes} />
+        </div>
+      </div>
+
+      <div className="grade-totais" style={{ background: "var(--borda)", border: "1px solid var(--borda)" }}>
+        <StatCard label="Entrou" valor={currency(entrou)} icone={IconTrendUp} tom="ok" />
+        <StatCard label="Saiu" valor={currency(saiu)} icone={IconTrendDown} tom="perigo"
+                  rodape={deltaMes == null ? "sem mês anterior" :
+                    (deltaMes >= 0 ? "+" : "") + deltaMes.toFixed(0) + "% vs. mês anterior"} />
+        <StatCard label="Sobrou" valor={currency(sobrou)} icone={IconWallet} tom={sobrou >= 0 ? "ok" : "perigo"} />
+        <StatCard label="No cartão" valor={currency(noCartao)} icone={IconCard} />
+      </div>
+
+      <Cartao className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <IconTag size={15} style={{ color: "var(--acento-vivo)" }} />
+          <h3 className="text-sm font-bold">Despesas por categoria</h3>
+        </div>
+        {porCategoria.length === 0 ? (
+          <Vazio texto="Nenhuma despesa neste mês ainda." />
+        ) : (
+          <div className="space-y-2.5">
+            {porCategoria.map(c => {
+              const dif = c.antes > 0 ? ((c.valor - c.antes) / c.antes) * 100 : null;
+              return (
+                <div key={c.id}>
+                  <div className="flex items-baseline justify-between gap-2 text-[13px]">
+                    <span className="font-semibold">{c.nome}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(c.valor)}</span>
+                  </div>
+                  <div className="h-1.5 rounded mt-1" style={{ background: "var(--linha)" }}>
+                    <div className="h-1.5 rounded" style={{ width: (maior ? (c.valor / maior) * 100 : 0) + "%", background: c.cor }} />
+                  </div>
+                  <div className="text-[11px] mt-0.5" style={{ color: "var(--suave)" }}>
+                    mês anterior {currency(c.antes)}
+                    {dif == null ? "" : " · " + (dif >= 0 ? "+" : "") + dif.toFixed(0) + "%"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Cartao>
+    </div>
+  );
+}
+
+/* ===========================================================
+   ABA LANCAMENTOS
+=========================================================== */
+function AbaLancamentos({ dados, mes, onMes, onEditar, onNovo, dadosProntos }) {
+  const [filtro, setFiltro] = useState("TUDO");
+  const [onde, setOnde] = useState("");
+  const catPorId = indexarPorId(dados.categorias);
+  const contaPorId = indexarPorId(dados.contas);
+  const cartaoPorId = indexarPorId(dados.cartoes);
+  const cabe = (l) => filtro === "TUDO" || titularidadeDoLancamento(l, contaPorId, cartaoPorId) === filtro;
+  const cabeOnde = (l) => !onde || l.contaId === onde || l.cartaoId === onde;
+
+  const lista = (dados.lancamentos || [])
+    .filter(l => mesDaData(l.data) === mes)
+    .filter(cabe).filter(cabeOnde)
+    .sort((a, b) => String(b.data).localeCompare(String(a.data)) ||
+                    String(b.criadoEm || "").localeCompare(String(a.criadoEm || "")));
+
+  const ondeSaiu = (l) => l.cartaoId ? ((cartaoPorId[l.cartaoId] || {}).nome || "cartão")
+                        : l.contaId ? ((contaPorId[l.contaId] || {}).nome || "conta")
+                        : formaPorId(l.forma).rotulo;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-base font-bold">Lançamentos</h2>
+        <div className="flex items-center gap-2 flex-wrap no-print">
+          <FiltroTitular valor={filtro} onValor={setFiltro} />
+          <Selecao value={onde} onChange={(e) => setOnde(e.target.value)} style={{ width: "auto" }}>
+            <option value="">Todas as contas e cartões</option>
+            {(dados.contas || []).map(c => <option key={c.id} value={c.id}>{c.nome || c.codigo} · {c.banco}</option>)}
+            {(dados.cartoes || []).map(c => <option key={c.id} value={c.id}>Cartão {c.nome} · {c.banco}</option>)}
+          </Selecao>
+          <SeletorMes mes={mes} onMes={onMes} />
+          <Botao tom="acento" onClick={onNovo} disabled={!dadosProntos}>
+            <IconPlus size={15} /> {dadosProntos ? "Novo" : "Carregando lançamentos..."}
+          </Botao>
+        </div>
+      </div>
+
+      {lista.length === 0 ? (
+        <Cartao><Vazio texto={"Nenhum lançamento em " + mesPorExtenso(mes) + "."} /></Cartao>
+      ) : (
+        <Cartao className="overflow-hidden">
+          <div className="rolagem-resp" style={{ overflowX: "auto" }}>
+            <table className="tab-resp w-full text-[13px]">
+              <thead>
+                <tr style={{ background: "var(--barra)", color: "var(--na-barra-suave)" }}>
+                  <th className="text-left font-semibold px-3 py-2">Data</th>
+                  <th className="text-left font-semibold px-3 py-2">Descrição</th>
+                  <th className="text-left font-semibold px-3 py-2">Categoria</th>
+                  <th className="text-left font-semibold px-3 py-2">Onde</th>
+                  <th className="text-right font-semibold px-3 py-2">Valor</th>
+                  <th className="px-3 py-2 no-print"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {lista.map(l => {
+                  const cat = catPorId[l.categoria];
+                  const receita = (l.tipo || "despesa") === "receita";
+                  return (
+                    <tr key={l.id} style={{ borderTop: "1px solid var(--linha)" }}>
+                      <td className="px-3 py-2" data-rot="Data" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{dataCurta(l.data)}</td>
+                      <td className="px-3 py-2" data-rot="Descrição">
+                        <div className="font-semibold">{l.estabelecimento || l.descricao || "(sem nome)"}</div>
+                        {l.estabelecimento && l.descricao ? <div className="text-[11px]" style={{ color: "var(--suave)" }}>{l.descricao}</div> : null}
+                      </td>
+                      <td className="px-3 py-2" data-rot="Categoria">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span style={{ width: 8, height: 8, borderRadius: 8, background: (cat && cat.cor) || "#64748B", display: "inline-block" }} />
+                          {(cat && cat.nome) || "Sem categoria"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2" data-rot="Onde" style={{ color: "var(--suave)" }}>{ondeSaiu(l)}</td>
+                      <td className="px-3 py-2 text-right" data-rot="Valor"
+                          style={{ fontFamily: "'JetBrains Mono', monospace", color: receita ? "var(--ok-claro)" : "var(--texto)" }}>
+                        {receita ? "+" : "−"} {currency(l.valor)}
+                      </td>
+                      <td className="px-3 py-2 text-right no-print">
+                        <button onClick={() => onEditar(l)} title="Editar" style={{ color: "var(--suave)" }}><IconEdit size={15} /></button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Cartao>
+      )}
+    </div>
+  );
+}
+
+
+/* ===========================================================
+   ABA BANCOS — a situacao de cada banco, e os sinteticos PF e PJ
+=========================================================== */
+function ChipTitular({ valor }) {
+  const pj = valor === "PJ";
+  return (
+    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+          style={{ background: pj ? "rgba(56,189,248,.18)" : "var(--chip-quente)",
+                   color: pj ? "#7DD3FC" : "var(--acento-vivo)" }}>{valor || "PF"}</span>
+  );
+}
+
+function FiltroTitular({ valor, onValor }) {
+  return (
+    <div className="flex gap-1 no-print">
+      {[{ id: "TUDO", r: "Tudo" }, { id: "PF", r: "PF" }, { id: "PJ", r: "PJ" }].map(o => (
+        <button key={o.id} onClick={() => onValor(o.id)}
+          className="px-3 py-1.5 rounded-md text-[13px] font-semibold"
+          style={{
+            background: valor === o.id ? "var(--selecionado-bg)" : "var(--superficie)",
+            color: valor === o.id ? "var(--selecionado-txt)" : "var(--texto)",
+            border: "1px solid " + (valor === o.id ? "var(--selecionado-bg)" : "var(--borda)")
+          }}>{o.r}</button>
+      ))}
+    </div>
+  );
+}
+
+function AbaBancos({ dados, alterar, mes }) {
+  const [filtro, setFiltro] = useState("TUDO");
+  const [aberta, setAberta] = useState(null);   // conta com extrato aberto
+  const [novaApl, setNovaApl] = useState(null); // aplicacao sendo atualizada
+
+  const mapaContas = indexarPorId(dados.contas);
+  const mapaCartoes = indexarPorId(dados.cartoes);
+  const cabe = (t) => filtro === "TUDO" || (t || "PF") === filtro;
+
+  const contas = (dados.contas || []).filter(c => cabe(c.titularidade));
+  const cartoes = (dados.cartoes || []).filter(c => cabe(c.titularidade));
+  const aplicacoes = (dados.aplicacoes || []).filter(a => cabe(a.titularidade));
+  const contratos = (dados.contratos || []).filter(c => cabe(c.titularidade));
+
+  const emConta = contas.reduce((s, c) => s + saldoDaConta(c, dados.lancamentos), 0);
+  const aplicado = aplicacoes.reduce((s, a) => s + saldoAplicacao(a), 0);
+  const faturaAberta = (dados.lancamentos || [])
+    .filter(l => l.cartaoId && mapaCartoes[l.cartaoId] && cabe(mapaCartoes[l.cartaoId].titularidade))
+    .filter(l => mesDaData(l.data) === mes)
+    .reduce((s, l) => s + (Number(l.valor) || 0), 0);
+  const divida = contratos.reduce((s, c) => s + resumoContrato(c).saldoDevedor, 0);
+  const liquido = emConta + aplicado - faturaAberta - divida;
+
+  /* Cada banco vira um bloco, com as contas, aplicacoes e contratos
+     que estao dentro dele. */
+  const bancos = useMemo(() => {
+    const mapa = {};
+    const poe = (chave, banco, titular) => {
+      if (!mapa[chave]) mapa[chave] = { chave: chave, banco: banco, titularidade: titular, contas: [], cartoes: [], aplicacoes: [], contratos: [] };
+      return mapa[chave];
+    };
+    const chaveDe = (x) => (x.titularidade || "PF") + "|" + ((x.banco || "").trim() || "Sem banco");
+    contas.forEach(c => poe(chaveDe(c), (c.banco || "").trim() || "Sem banco", c.titularidade || "PF").contas.push(c));
+    cartoes.forEach(c => poe(chaveDe(c), (c.banco || "").trim() || "Sem banco", c.titularidade || "PF").cartoes.push(c));
+    aplicacoes.forEach(a => poe(chaveDe(a), (a.banco || "").trim() || "Sem banco", a.titularidade || "PF").aplicacoes.push(a));
+    contratos.forEach(c => poe(chaveDe(c), (c.banco || "").trim() || "Sem banco", c.titularidade || "PF").contratos.push(c));
+    return Object.keys(mapa).sort().map(k => mapa[k]);
+  }, [contas, cartoes, aplicacoes, contratos, dados.lancamentos]);
+
+  if (aberta) {
+    return <ExtratoDaConta conta={aberta} dados={dados} onVoltar={() => setAberta(null)} />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-base font-bold">Bancos</h2>
+        <FiltroTitular valor={filtro} onValor={setFiltro} />
+      </div>
+
+      <div className="grade-totais" style={{ background: "var(--borda)", border: "1px solid var(--borda)" }}>
+        <StatCard label={"Em conta" + (filtro === "TUDO" ? "" : " · " + filtro)} valor={currency(emConta)} icone={IconBank} tom={emConta >= 0 ? "ok" : "perigo"} />
+        <StatCard label="Aplicado" valor={currency(aplicado)} icone={IconCofre} />
+        <StatCard label={"Fatura de " + mesPorExtenso(mes)} valor={currency(faturaAberta)} icone={IconCard} />
+        <StatCard label="Dívida (contratos)" valor={currency(divida)} icone={IconContrato} tom={divida > 0 ? "perigo" : "neutro"} />
+      </div>
+      <Cartao className="p-3">
+        <div className="flex items-baseline justify-between">
+          <span className="text-[11px] uppercase tracking-wider" style={{ color: "var(--suave)" }}>
+            Situação líquida {filtro === "TUDO" ? "geral" : "de " + filtro}
+          </span>
+          <span className="text-xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: liquido >= 0 ? "var(--ok-claro)" : "var(--erro-claro)" }}>
+            {currency(liquido)}
+          </span>
+        </div>
+        <div className="text-[11px] mt-1" style={{ color: "var(--suave)" }}>
+          em conta + aplicado − fatura aberta − saldo devedor dos contratos
+        </div>
+      </Cartao>
+
+      {bancos.length === 0 ? (
+        <Cartao><Vazio texto="Nenhuma conta cadastrada ainda. Vá em Ajustes → Contas." /></Cartao>
+      ) : bancos.map(b => (
+        <Cartao key={b.chave} className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <IconBank size={16} style={{ color: "var(--acento-vivo)" }} />
+            <h3 className="text-sm font-bold">{b.banco}</h3>
+            <ChipTitular valor={b.titularidade} />
+          </div>
+
+          {b.contas.map(c => {
+            const saldo = saldoDaConta(c, dados.lancamentos);
+            const cob = coberturaDaConta(c.id, dados.coberturas);
+            const furos = furosDaConta(c.id, dados.coberturas);
+            return (
+              <div key={c.id} className="py-2" style={{ borderTop: "1px solid var(--linha)" }}>
+                <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                  <div>
+                    <span className="text-[13px] font-semibold">{c.nome || "(sem nome)"}</span>
+                    <span className="text-[11px] ml-2" style={{ color: "var(--suave)" }}>{c.codigo}</span>
+                  </div>
+                  <span className="text-[15px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: saldo >= 0 ? "var(--texto)" : "var(--erro-claro)" }}>
+                    {currency(saldo)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap mt-1">
+                  <span className="text-[11px]" style={{ color: "var(--suave)" }}>
+                    {cob ? "extrato de " + dataCurta(cob.de) + " a " + dataCurta(cob.ate) + " (" + cob.quantos + " arquivo(s))" : "nenhum extrato importado"}
+                  </span>
+                  <button className="text-[11px] underline no-print" style={{ color: "var(--acento-vivo)" }}
+                          onClick={() => setAberta(c)}>ver extrato</button>
+                </div>
+                {furos.length ? (
+                  <div className="mt-1.5">
+                    <Faixa tom="erro">
+                      Extrato parcial nesta conta: falta o período{furos.length > 1 ? "s" : ""}{" "}
+                      {furos.map(f => dataCurta(f.de) + " a " + dataCurta(f.ate)).join(", ")}.
+                      Mande o extrato desse pedaço para fechar a conta.
+                    </Faixa>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+
+          {b.cartoes.map(k => {
+            const gasto = (dados.lancamentos || []).filter(l => l.cartaoId === k.id && mesDaData(l.data) === mes)
+                                                   .reduce((s, l) => s + (Number(l.valor) || 0), 0);
+            return (
+              <div key={k.id} className="py-2 flex items-baseline justify-between gap-2" style={{ borderTop: "1px solid var(--linha)" }}>
+                <div>
+                  <span className="text-[13px] font-semibold inline-flex items-center gap-1.5"><IconCard size={13} /> {k.nome || "(sem nome)"}</span>
+                  <span className="text-[11px] ml-2" style={{ color: "var(--suave)" }}>fecha dia {k.diaFechamento} · vence dia {k.diaVencimento}</span>
+                </div>
+                <span className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(gasto)}</span>
+              </div>
+            );
+          })}
+
+          {b.aplicacoes.map(a => {
+            const v = variacaoAplicacao(a);
+            return (
+              <div key={a.id} className="py-2 flex items-baseline justify-between gap-2 flex-wrap" style={{ borderTop: "1px solid var(--linha)" }}>
+                <div>
+                  <span className="text-[13px] font-semibold inline-flex items-center gap-1.5"><IconCofre size={13} /> {a.nome || "(sem nome)"}</span>
+                  <span className="text-[11px] ml-2" style={{ color: "var(--suave)" }}>
+                    {a.tipo || "aplicação"} · saldo de {dataSaldoAplicacao(a) ? dataCurta(dataSaldoAplicacao(a)) : "—"}
+                    {v ? " · " + (v.valor >= 0 ? "+" : "") + currency(v.valor) + (v.pct == null ? "" : " (" + (v.pct >= 0 ? "+" : "") + v.pct.toFixed(2) + "%)") : ""}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(saldoAplicacao(a))}</span>
+                  <button className="text-[11px] underline no-print" style={{ color: "var(--acento-vivo)" }}
+                          onClick={() => setNovaApl(a)}>atualizar</button>
+                </div>
+              </div>
+            );
+          })}
+
+          {b.contratos.map(c => {
+            const r = resumoContrato(c);
+            return (
+              <div key={c.id} className="py-2 flex items-baseline justify-between gap-2 flex-wrap" style={{ borderTop: "1px solid var(--linha)" }}>
+                <div>
+                  <span className="text-[13px] font-semibold inline-flex items-center gap-1.5"><IconContrato size={13} /> {c.descricao || "(contrato)"}</span>
+                  <span className="text-[11px] ml-2" style={{ color: "var(--suave)" }}>
+                    {r.pagas} de {r.total} pagas · faltam {r.faltam}
+                    {r.vencidas ? " · " + r.vencidas + " vencida(s)" : ""}
+                  </span>
+                </div>
+                <span className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--erro-claro)" }}>
+                  {currency(r.saldoDevedor)}
+                </span>
+              </div>
+            );
+          })}
+        </Cartao>
+      ))}
+
+      {novaApl ? (
+        <ModalAtualizarAplicacao aplicacao={novaApl} onClose={() => setNovaApl(null)}
+          onSalvar={(data, valor) => {
+            alterar(d => Object.assign({}, d, {
+              aplicacoes: (d.aplicacoes || []).map(a => a.id === novaApl.id
+                ? Object.assign({}, a, { historico: (a.historico || []).filter(h => h.data !== data).concat([{ data: data, valor: valor, origem: "manual" }]) })
+                : a)
+            }));
+            setNovaApl(null);
+          }} />
+      ) : null}
+    </div>
+  );
+}
+
+function ModalAtualizarAplicacao({ aplicacao, onSalvar, onClose }) {
+  const [data, setData] = useState(dataHojeISO());
+  const [valor, setValor] = useState("");
+  return (
+    <Modal titulo={"Saldo de " + (aplicacao.nome || "aplicação")} onClose={onClose} largura={420}>
+      <div className="space-y-3">
+        <p className="text-[12px]" style={{ color: "var(--suave)" }}>
+          Na v3 isso vem do print da tela do banco, lido pela IA. Por enquanto, o número na mão.
+        </p>
+        <div className="grade-form">
+          <Campo label="Data do saldo"><Entrada type="date" value={data} onChange={(e) => setData(e.target.value)} /></Campo>
+          <Campo label="Saldo (R$)"><Entrada inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" /></Campo>
+        </div>
+        <div className="flex gap-2">
+          <Botao tom="acento" disabled={!paraNumero(valor)} onClick={() => onSalvar(data, paraNumero(valor))}>
+            <IconCheck size={15} /> Guardar
+          </Botao>
+          <Botao tom="neutro" onClick={onClose}>Cancelar</Botao>
+        </div>
+        {(aplicacao.historico || []).length ? (
+          <div className="pt-2">
+            <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: "var(--suave)" }}>Histórico</div>
+            {(aplicacao.historico || []).slice().sort((a, b) => String(b.data).localeCompare(String(a.data))).slice(0, 8).map(h => (
+              <div key={h.data} className="flex justify-between text-[12px] py-0.5">
+                <span style={{ color: "var(--suave)" }}>{dataCurta(h.data)}</span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(h.valor)}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </Modal>
+  );
+}
+
+/* ===========================================================
+   EXTRATO DE UMA CONTA — com o saldo em cada linha
+=========================================================== */
+function ExtratoDaConta({ conta, dados, onVoltar }) {
+  const catPorId = indexarPorId(dados.categorias);
+  const linhas = extratoDaConta(conta, dados.lancamentos).slice().reverse();
+  const furos = furosDaConta(conta.id, dados.coberturas);
+  const cobs = (dados.coberturas || []).filter(c => c.contaId === conta.id)
+    .sort((a, b) => String(b.ini).localeCompare(String(a.ini)));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Botao tom="neutro" onClick={onVoltar} className="no-print">‹ Bancos</Botao>
+        <h2 className="text-base font-bold">{conta.nome}</h2>
+        <ChipTitular valor={conta.titularidade} />
+        <span className="text-[12px]" style={{ color: "var(--suave)" }}>{conta.banco} · {conta.codigo}</span>
+        <span className="ml-auto text-lg font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {currency(saldoDaConta(conta, dados.lancamentos))}
+        </span>
+      </div>
+
+      {furos.length ? (
+        <Faixa tom="erro">
+          Extrato parcial: falta o período {furos.map(f => dataCurta(f.de) + " a " + dataCurta(f.ate)).join(", ")}.
+          O saldo das linhas anteriores a esse furo não é confiável enquanto o pedaço não entrar.
+        </Faixa>
+      ) : null}
+
+      {cobs.length ? (
+        <Cartao className="p-3">
+          <div className="text-[11px] uppercase tracking-wide mb-2" style={{ color: "var(--suave)" }}>Extratos importados</div>
+          {cobs.map(c => {
+            const conf = conferirCobertura(c);
+            return (
+              <div key={c.id} className="py-1.5 text-[12px]" style={{ borderTop: "1px solid var(--linha)" }}>
+                <div className="flex justify-between gap-2 flex-wrap">
+                  <span>{dataCurta(c.ini)} a {dataCurta(c.fim)} · {c.arquivo || "arquivo"}</span>
+                  <span style={{ color: conf.completo === false ? "var(--erro-claro)" : conf.completo ? "var(--ok-claro)" : "var(--suave)" }}>
+                    {conf.completo === false ? "parcial" : conf.completo ? "completo" : "sem saldo final"}
+                  </span>
+                </div>
+                <div style={{ color: "var(--suave)" }}>{conf.texto}</div>
+              </div>
+            );
+          })}
+        </Cartao>
+      ) : null}
+
+      {linhas.length === 0 ? (
+        <Cartao><Vazio texto="Nenhum lançamento nesta conta ainda." /></Cartao>
+      ) : (
+        <Cartao className="overflow-hidden">
+          <div className="rolagem-resp" style={{ overflowX: "auto" }}>
+            <table className="tab-resp w-full text-[13px]">
+              <thead>
+                <tr style={{ background: "var(--barra)", color: "var(--na-barra-suave)" }}>
+                  <th className="text-left font-semibold px-3 py-2">Data</th>
+                  <th className="text-left font-semibold px-3 py-2">Histórico</th>
+                  <th className="text-left font-semibold px-3 py-2">Categoria</th>
+                  <th className="text-right font-semibold px-3 py-2">Valor</th>
+                  <th className="text-right font-semibold px-3 py-2">Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {linhas.map(l => {
+                  const cat = catPorId[l.categoria];
+                  const receita = (l.tipo || "despesa") === "receita";
+                  return (
+                    <tr key={l.id} style={{ borderTop: "1px solid var(--linha)" }}>
+                      <td className="px-3 py-2" data-rot="Data" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{dataCurta(l.data)}</td>
+                      <td className="px-3 py-2" data-rot="Histórico">
+                        <div className="font-semibold">{l.estabelecimento || l.descricao || "(sem nome)"}</div>
+                        <div className="text-[11px]" style={{ color: "var(--suave)" }}>
+                          {l.origem === "extrato" ? "veio do extrato" : l.origem === "fatura" ? "veio da fatura" : l.origem === "foto" ? "veio da foto" : "digitado"}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2" data-rot="Categoria">{(cat && cat.nome) || "Sem categoria"}</td>
+                      <td className="px-3 py-2 text-right" data-rot="Valor"
+                          style={{ fontFamily: "'JetBrains Mono', monospace", color: receita ? "var(--ok-claro)" : "var(--texto)" }}>
+                        {receita ? "+" : "−"} {currency(l.valor)}
+                      </td>
+                      <td className="px-3 py-2 text-right" data-rot="Saldo"
+                          style={{ fontFamily: "'JetBrains Mono', monospace", color: l.saldo >= 0 ? "var(--suave)" : "var(--erro-claro)" }}>
+                        {currency(l.saldo)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Cartao>
+      )}
+    </div>
+  );
+}
+
+
+/* ===========================================================
+   ABA CONTRATOS — financiamento, emprestimo, consorcio.
+   Quantas parcelas faltam, quanto ja foi pago, o prazo, a taxa
+   e o comeco e o fim — dentro do banco de cada um.
+=========================================================== */
+const TIPOS_CONTRATO = [
+  { id: "financiamento", rotulo: "Financiamento" },
+  { id: "emprestimo",    rotulo: "Empréstimo" },
+  { id: "consorcio",     rotulo: "Consórcio" },
+  { id: "leasing",       rotulo: "Leasing" }
+];
+
+function AbaContratos({ dados, alterar }) {
+  const [filtro, setFiltro] = useState("TUDO");
+  const [editando, setEditando] = useState(null);
+  const [aberto, setAberto] = useState(null);
+
+  const cabe = (t) => filtro === "TUDO" || (t || "PF") === filtro;
+  const lista = (dados.contratos || []).filter(c => cabe(c.titularidade));
+
+  const salvar = (c) => {
+    const g = gerarParcelas(c, c.parcelas);
+    const pronto = Object.assign({}, c, { parcelas: g.parcelas, taxaMes: g.taxaUsada, valorParcela: Math.round(g.parcelaUsada * 100) / 100 });
+    alterar(d => {
+      const existe = (d.contratos || []).some(x => x.id === pronto.id);
+      return Object.assign({}, d, {
+        contratos: existe ? d.contratos.map(x => x.id === pronto.id ? pronto : x) : (d.contratos || []).concat([pronto])
+      });
+    });
+    setEditando(null);
+    setAberto(pronto.id);
+  };
+
+  const baixarParcela = (contratoId, n, marcado, quando, quanto) =>
+    alterar(d => Object.assign({}, d, {
+      contratos: (d.contratos || []).map(c => c.id !== contratoId ? c : Object.assign({}, c, {
+        parcelas: (c.parcelas || []).map(p => p.n !== n ? p : Object.assign({}, p, {
+          pago: marcado, dataPagamento: marcado ? (quando || dataHojeISO()) : "", valorPago: marcado ? (quanto || p.valor) : 0
+        }))
+      }))
+    }));
+
+  const contratoAberto = lista.filter(c => c.id === aberto)[0] || null;
+
+  /* O modal precisa existir nas DUAS telas — na lista e dentro do
+     contrato aberto. Deixar so na lista fazia o botao Editar do
+     painel nao abrir nada. */
+  const modal = editando
+    ? <ModalContrato inicial={editando} dados={dados} onSalvar={salvar} onClose={() => setEditando(null)} />
+    : null;
+
+  if (contratoAberto) {
+    return (
+      <>
+        <PainelContrato contrato={contratoAberto} dados={dados}
+          onVoltar={() => setAberto(null)} onEditar={() => setEditando(contratoAberto)}
+          onBaixar={baixarParcela}
+          onExcluir={() => { alterar(d => Object.assign({}, d, { contratos: (d.contratos || []).filter(x => x.id !== contratoAberto.id) })); setAberto(null); }} />
+        {modal}
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-base font-bold">Contratos</h2>
+        <div className="flex items-center gap-2 flex-wrap no-print">
+          <FiltroTitular valor={filtro} onValor={setFiltro} />
+          <Botao tom="acento" onClick={() => setEditando({ id: uid(), titularidade: filtro === "PJ" ? "PJ" : "PF" })}>
+            <IconPlus size={15} /> Novo
+          </Botao>
+        </div>
+      </div>
+
+      {lista.length === 0 ? (
+        <Cartao><Vazio texto="Nenhum contrato cadastrado. Cadastre o financiamento e o app monta a tabela de parcelas sozinho." /></Cartao>
+      ) : lista.map(c => {
+        const r = resumoContrato(c);
+        const pct = r.total ? (r.pagas / r.total) * 100 : 0;
+        return (
+          <Cartao key={c.id} className="p-4">
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <div>
+                <div className="flex items-center gap-2">
+                  <IconContrato size={15} style={{ color: "var(--acento-vivo)" }} />
+                  <h3 className="text-sm font-bold">{c.descricao || "(contrato)"}</h3>
+                  <ChipTitular valor={c.titularidade} />
+                </div>
+                <div className="text-[12px] mt-0.5" style={{ color: "var(--suave)" }}>
+                  {c.banco || "sem banco"} · {(TIPOS_CONTRATO.filter(t => t.id === c.tipo)[0] || {}).rotulo || "contrato"}
+                </div>
+              </div>
+              <button className="text-[12px] underline no-print" style={{ color: "var(--acento-vivo)" }}
+                      onClick={() => setAberto(c.id)}>abrir</button>
+            </div>
+
+            <div className="h-1.5 rounded mt-3" style={{ background: "var(--linha)" }}>
+              <div className="h-1.5 rounded" style={{ width: pct + "%", background: "var(--acento)" }} />
+            </div>
+
+            <div className="grade-form-2 mt-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--suave)" }}>Parcelas</div>
+                <div className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  {r.pagas} pagas · faltam {r.faltam}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--suave)" }}>Já pago</div>
+                <div className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--ok-claro)" }}>{currency(r.totalPago)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--suave)" }}>Saldo devedor</div>
+                <div className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--erro-claro)" }}>{currency(r.saldoDevedor)}</div>
+              </div>
+            </div>
+
+            <div className="text-[12px] mt-2" style={{ color: "var(--suave)" }}>
+              prazo {r.total} meses · {dataCurta(r.inicio)} a {dataCurta(r.fim)} ·
+              taxa {r.taxaMes.toFixed(4).replace(".", ",")}% a.m. ({r.taxaAno.toFixed(2).replace(".", ",")}% a.a.)
+              {r.proxima ? " · próxima em " + dataCurta(r.proxima.vencimento) + " de " + currency(r.proxima.valor) : " · quitado"}
+            </div>
+            {r.vencidas ? <div className="mt-2"><Faixa tom="erro">{r.vencidas} parcela(s) vencida(s) sem baixa.</Faixa></div> : null}
+          </Cartao>
+        );
+      })}
+
+      {modal}
+    </div>
+  );
+}
+
+function ModalContrato({ inicial, dados, onSalvar, onClose }) {
+  const b = inicial || {};
+  const [titularidade, setTitularidade] = useState(b.titularidade || "PF");
+  const [descricao, setDescricao] = useState(b.descricao || "");
+  const [banco, setBanco] = useState(b.banco || "");
+  const [tipo, setTipo] = useState(b.tipo || "financiamento");
+  const [contaId, setContaId] = useState(b.contaId || "");
+  const [valorFinanciado, setValor] = useState(b.valorFinanciado ? String(b.valorFinanciado).replace(".", ",") : "");
+  const [prazoMeses, setPrazo] = useState(b.prazoMeses ? String(b.prazoMeses) : "");
+  const [taxaMes, setTaxa] = useState(b.taxaMes ? String(b.taxaMes).replace(".", ",") : "");
+  const [valorParcela, setParcela] = useState(b.valorParcela ? String(b.valorParcela).replace(".", ",") : "");
+  const [dataInicio, setInicio] = useState(b.dataInicio || dataHojeISO());
+  const [diaVencimento, setDia] = useState(String(b.diaVencimento || 10));
+  const [avisos, setAvisos] = useState([]);
+
+  const montar = () => ({
+    id: b.id || uid(), titularidade: titularidade, descricao: descricao.trim(), banco: banco.trim(),
+    tipo: tipo, contaId: contaId, valorFinanciado: paraNumero(valorFinanciado),
+    prazoMeses: Number(prazoMeses) || 0, taxaMes: paraNumero(taxaMes),
+    valorParcela: paraNumero(valorParcela), dataInicio: dataInicio,
+    diaVencimento: Number(diaVencimento) || 0, parcelas: b.parcelas || []
+  });
+
+  const previa = useMemo(() => {
+    const c = montar();
+    if (!c.valorFinanciado || !c.prazoMeses) return null;
+    const g = gerarParcelas(c, []);
+    return { taxa: g.taxaUsada, parcela: g.parcelaUsada, total: g.parcelas.reduce((s, p) => s + p.valor, 0), fim: g.parcelas.length ? g.parcelas[g.parcelas.length - 1].vencimento : "" };
+  }, [valorFinanciado, prazoMeses, taxaMes, valorParcela, dataInicio, diaVencimento]);
+
+  const tentar = () => {
+    const c = montar();
+    const e = [];
+    if (!c.descricao) e.push("Dê um nome ao contrato (ex.: Financiamento do Hilux).");
+    if (!c.valorFinanciado) e.push("Falta o valor financiado.");
+    if (!c.prazoMeses) e.push("Falta o prazo em meses.");
+    if (!c.taxaMes && !c.valorParcela) e.push("Informe a taxa ao mês OU o valor da parcela — o app descobre a outra.");
+    if (e.length) { setAvisos(e); return; }
+    onSalvar(c);
+  };
+
+  return (
+    <Modal titulo={b.descricao ? "Editar contrato" : "Novo contrato"} onClose={onClose} largura={620}>
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          {TITULARIDADES.map(t => (
+            <button key={t.id} onClick={() => setTitularidade(t.id)} className="flex-1 py-2 rounded-md text-sm font-semibold"
+              style={{ background: titularidade === t.id ? "var(--selecionado-bg)" : "var(--superficie)",
+                       color: titularidade === t.id ? "var(--selecionado-txt)" : "var(--texto)",
+                       border: "1px solid " + (titularidade === t.id ? "var(--selecionado-bg)" : "var(--borda)") }}>
+              {t.rotulo}
+            </button>
+          ))}
+        </div>
+
+        <Campo label="Nome do contrato"><Entrada value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex.: Financiamento do caminhão" /></Campo>
+
+        <div className="grade-form">
+          <Campo label="Banco"><Entrada value={banco} onChange={(e) => setBanco(e.target.value)} placeholder="Ex.: Itaú" /></Campo>
+          <Campo label="Tipo">
+            <Selecao value={tipo} onChange={(e) => setTipo(e.target.value)}>
+              {TIPOS_CONTRATO.map(t => <option key={t.id} value={t.id}>{t.rotulo}</option>)}
+            </Selecao>
+          </Campo>
+        </div>
+
+        <Campo label="Debita na conta">
+          <Selecao value={contaId} onChange={(e) => setContaId(e.target.value)}>
+            <option value="">— nenhuma —</option>
+            {(dados.contas || []).filter(c => (c.titularidade || "PF") === titularidade).map(c => (
+              <option key={c.id} value={c.id}>{c.nome || "(sem nome)"} · {c.banco}</option>
+            ))}
+          </Selecao>
+        </Campo>
+
+        <div className="grade-form-2">
+          <Campo label="Valor financiado (R$)"><Entrada inputMode="decimal" value={valorFinanciado} onChange={(e) => setValor(e.target.value)} placeholder="0,00" /></Campo>
+          <Campo label="Prazo (meses)"><Entrada type="number" min="1" value={prazoMeses} onChange={(e) => setPrazo(e.target.value)} placeholder="60" /></Campo>
+          <Campo label="1ª parcela vence em"><Entrada type="date" value={dataInicio} onChange={(e) => setInicio(e.target.value)} /></Campo>
+        </div>
+
+        <div className="grade-form-2">
+          <Campo label="Taxa (% ao mês)" dica="Deixe em branco se souber a parcela."><Entrada inputMode="decimal" value={taxaMes} onChange={(e) => setTaxa(e.target.value)} placeholder="1,29" /></Campo>
+          <Campo label="Valor da parcela (R$)" dica="Deixe em branco se souber a taxa."><Entrada inputMode="decimal" value={valorParcela} onChange={(e) => setParcela(e.target.value)} placeholder="0,00" /></Campo>
+          <Campo label="Dia do vencimento"><Entrada type="number" min="1" max="31" value={diaVencimento} onChange={(e) => setDia(e.target.value)} /></Campo>
+        </div>
+
+        {previa ? (
+          <Cartao className="p-3">
+            <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: "var(--suave)" }}>Como vai ficar</div>
+            <div className="text-[13px]">
+              parcela de <b style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(previa.parcela)}</b> ·
+              taxa <b>{previa.taxa.toFixed(4).replace(".", ",")}% a.m.</b> ·
+              total <b style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(previa.total)}</b> ·
+              última em <b>{dataCurta(previa.fim)}</b>
+            </div>
+          </Cartao>
+        ) : null}
+
+        {avisos.length ? <Faixa tom="erro">{avisos.map((a, i) => <div key={i}>{a}</div>)}</Faixa> : null}
+
+        <div className="flex gap-2">
+          <Botao tom="acento" onClick={tentar}><IconCheck size={15} /> Salvar e montar as parcelas</Botao>
+          <Botao tom="neutro" onClick={onClose}>Cancelar</Botao>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function PainelContrato({ contrato, dados, onVoltar, onEditar, onBaixar, onExcluir }) {
+  const r = resumoContrato(contrato);
+  const hoje = dataHojeISO();
+  const conta = indexarPorId(dados.contas)[contrato.contaId];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Botao tom="neutro" onClick={onVoltar} className="no-print">‹ Contratos</Botao>
+        <h2 className="text-base font-bold">{contrato.descricao}</h2>
+        <ChipTitular valor={contrato.titularidade} />
+        <div className="ml-auto flex gap-2 no-print">
+          <Botao tom="neutro" onClick={onEditar}><IconEdit size={15} /> Editar</Botao>
+          <Botao tom="perigo" onClick={onExcluir}><IconTrash size={15} /></Botao>
+        </div>
+      </div>
+
+      <div className="grade-totais" style={{ background: "var(--borda)", border: "1px solid var(--borda)" }}>
+        <StatCard label="Faltam" valor={r.faltam + " de " + r.total} icone={IconContrato} />
+        <StatCard label="Já pago" valor={currency(r.totalPago)} tom="ok" />
+        <StatCard label="Ainda a pagar" valor={currency(r.aPagar)} tom="perigo" />
+        <StatCard label="Saldo devedor" valor={currency(r.saldoDevedor)} tom="perigo" rodape="pelo saldo da tabela" />
+      </div>
+
+      <Cartao className="p-4">
+        <div className="grade-form-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--suave)" }}>Prazo</div>
+            <div className="text-[13px]">{r.total} meses · {dataCurta(r.inicio)} a {dataCurta(r.fim)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--suave)" }}>Taxa</div>
+            <div className="text-[13px]">{r.taxaMes.toFixed(4).replace(".", ",")}% a.m. · {r.taxaAno.toFixed(2).replace(".", ",")}% a.a.</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--suave)" }}>Banco / conta</div>
+            <div className="text-[13px]">{contrato.banco || "—"}{conta ? " · " + conta.nome : ""}</div>
+          </div>
+        </div>
+      </Cartao>
+
+      <Cartao className="overflow-hidden">
+        <div className="rolagem-resp" style={{ overflowX: "auto" }}>
+          <table className="tab-resp w-full text-[13px]">
+            <thead>
+              <tr style={{ background: "var(--barra)", color: "var(--na-barra-suave)" }}>
+                <th className="text-left font-semibold px-3 py-2">Nº</th>
+                <th className="text-left font-semibold px-3 py-2">Vencimento</th>
+                <th className="text-right font-semibold px-3 py-2">Parcela</th>
+                <th className="text-right font-semibold px-3 py-2">Juros</th>
+                <th className="text-right font-semibold px-3 py-2">Amortização</th>
+                <th className="text-right font-semibold px-3 py-2">Saldo devedor</th>
+                <th className="text-center font-semibold px-3 py-2">Pago</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(contrato.parcelas || []).map(p => {
+                const atrasada = !p.pago && p.vencimento < hoje;
+                return (
+                  <tr key={p.n} style={{ borderTop: "1px solid var(--linha)", background: atrasada ? "var(--erro-bg)" : "transparent" }}>
+                    <td className="px-3 py-2" data-rot="Nº" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{p.n}</td>
+                    <td className="px-3 py-2" data-rot="Vencimento" style={{ fontFamily: "'JetBrains Mono', monospace", color: atrasada ? "var(--erro-claro)" : "inherit" }}>{dataCurta(p.vencimento)}</td>
+                    <td className="px-3 py-2 text-right" data-rot="Parcela" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(p.valor)}</td>
+                    <td className="px-3 py-2 text-right" data-rot="Juros" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--suave)" }}>{currency(p.juros)}</td>
+                    <td className="px-3 py-2 text-right" data-rot="Amortização" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--suave)" }}>{currency(p.amortizacao)}</td>
+                    <td className="px-3 py-2 text-right" data-rot="Saldo devedor" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(p.saldoDevedor)}</td>
+                    <td className="px-3 py-2 text-center" data-rot="Pago">
+                      <input type="checkbox" checked={!!p.pago}
+                             onChange={(e) => onBaixar(contrato.id, p.n, e.target.checked)} />
+                      {p.pago && p.dataPagamento ? <span className="text-[11px] ml-2" style={{ color: "var(--suave)" }}>{dataCurta(p.dataPagamento)}</span> : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Cartao>
+    </div>
+  );
+}
+
+
+/* ===========================================================
+   PROCURAR DUPLICADOS
+   Pontuacao decide qual registro fica. Item que repete por
+   natureza NUNCA vem pre-marcado.
+=========================================================== */
+function PainelDuplicados({ dados, onRemover }) {
+  const grupos = useMemo(() => acharDuplicados(dados.lancamentos || [], dados.categorias || []), [dados.lancamentos, dados.categorias]);
+  const [marcados, setMarcados] = useState(() => {
+    const m = {};
+    grupos.forEach(g => { if (g.preMarcar) g.itens.slice(1).forEach(i => { m[i.id] = true; }); });
+    return m;
+  });
+  const total = Object.keys(marcados).filter(k => marcados[k]).length;
+
+  if (!grupos.length) return <Vazio texto="Nenhum lançamento repetido encontrado." />;
+
+  return (
+    <div className="space-y-3">
+      <Faixa tom="aviso">
+        {grupos.length === 1 ? "1 grupo parecido" : grupos.length + " grupos parecidos"}.
+        O primeiro de cada grupo é o mais completo e fica por padrão. Gasto que repete por natureza
+        (mercado, combustível, refeição) não vem marcado — duas compras iguais no mesmo dia acontecem de verdade.
+      </Faixa>
+      {grupos.map(g => (
+        <Cartao key={g.id} className="p-3">
+          <div className="text-[11px] mb-2" style={{ color: "var(--suave)" }}>
+            {g.forca >= 3 ? "Casamento certo (mesmo identificador do banco ou mesmo arquivo)"
+              : g.forca >= 2 ? "Mesmo dia, mesmo valor, mesmo estabelecimento"
+              : "Valor igual em dias próximos"}
+            {g.repetitiva ? " · categoria que repete por natureza" : ""}
+          </div>
+          {g.itens.map((l, idx) => (
+            <label key={l.id} className="flex items-center gap-3 py-1.5" style={{ borderTop: idx ? "1px solid var(--linha)" : "0" }}>
+              <input type="checkbox" checked={!!marcados[l.id]}
+                     onChange={(e) => { const v = e.target.checked; setMarcados(m => Object.assign({}, m, { [l.id]: v })); }} />
+              <span className="flex-1 text-[13px]">
+                <span className="font-semibold">{l.estabelecimento || l.descricao || "(sem nome)"}</span>
+                <span style={{ color: "var(--suave)" }}> · {dataCurta(l.data)} · {l.origem || "manual"}
+                  {idx === 0 ? " · fica (mais completo)" : ""}</span>
+              </span>
+              <span className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(l.valor)}</span>
+            </label>
+          ))}
+        </Cartao>
+      ))}
+      <Botao tom="perigo" disabled={!total}
+             onClick={() => onRemover(Object.keys(marcados).filter(k => marcados[k]))}>
+        <IconTrash size={15} /> Apagar {total} marcado(s)
+      </Botao>
+    </div>
+  );
+}
+
+/* ===========================================================
+   ABA AJUSTES
+=========================================================== */
+function Secao({ titulo, icone: IconC, children, sub }) {
+  return (
+    <Cartao className="p-4">
+      <div className="flex items-center gap-2 mb-1">
+        {IconC ? <IconC size={15} style={{ color: "var(--acento-vivo)" }} /> : null}
+        <h3 className="text-sm font-bold">{titulo}</h3>
+      </div>
+      {sub ? <p className="text-[12px] mb-3" style={{ color: "var(--suave)" }}>{sub}</p> : <div className="mb-3" />}
+      {children}
+    </Cartao>
+  );
+}
+
+/* Botao PF/PJ pequeno, usado dentro das linhas de cadastro. */
+function SeletorTitular({ valor, onValor }) {
+  return (
+    <div className="flex gap-1">
+      {TITULARIDADES.map(t => (
+        <button key={t.id} onClick={() => onValor(t.id)}
+          className="px-2.5 py-1.5 rounded-md text-[12px] font-bold"
+          style={{ background: (valor || "PF") === t.id ? "var(--selecionado-bg)" : "var(--superficie)",
+                   color: (valor || "PF") === t.id ? "var(--selecionado-txt)" : "var(--texto)",
+                   border: "1px solid " + ((valor || "PF") === t.id ? "var(--selecionado-bg)" : "var(--borda)") }}>
+          {t.id}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recarregar, salvarAgora }) {
+  const [appKey, setAppKey] = useState(() => dropboxAppKeyAtual());
+  const [apiKey, setApiKey] = useState(dados.config.apiKey || "");
+  const [mostrarChave, setMostrarChave] = useState(false);
+  const [msg, setMsg] = useState("");
+  const conectado = dropboxEstaConectado();
+  const redirect = typeof window !== "undefined" ? dropboxRedirectUri() : "";
+  const codigos = (dados.contas || []).map(c => c.codigo).filter(Boolean);
+
+  const novaConta  = () => ({ id: uid(), nome: "", banco: "", tipo: "corrente", titularidade: "PF", codigo: "", saldoInicial: 0, ativa: true });
+  const novoCartao = () => ({ id: uid(), nome: "", banco: "", titularidade: "PF", limite: 0, diaFechamento: 1, diaVencimento: 10, contaDebitoId: "", ativo: true });
+  const novaCategoria = () => ({ id: uid(), nome: "", tipo: "despesa", cor: CORES_CAT[Math.floor(Math.random() * CORES_CAT.length)], repetitiva: false, ativa: true });
+  const novaAplicacao = () => ({ id: uid(), nome: "", banco: "", titularidade: "PF", tipo: "CDB", contaId: "", historico: [] });
+
+  const mudarLista = (chave, id, campo, valor) =>
+    alterar(d => Object.assign({}, d, {
+      [chave]: (d[chave] || []).map(x => x.id === id ? Object.assign({}, x, { [campo]: valor }) : x)
+    }));
+  const addLista = (chave, item) => alterar(d => Object.assign({}, d, { [chave]: (d[chave] || []).concat([item]) }));
+  const delLista = (chave, id) => alterar(d => Object.assign({}, d, { [chave]: (d[chave] || []).filter(x => x.id !== id) }));
+
+  /* O codigo da conta e o nome da pasta no Dropbox: sai sozinho de
+     PF/PJ + banco, e da para trocar a mao se dois bancos colidirem. */
+  const mudarContaComCodigo = (id, campo, valor) =>
+    alterar(d => Object.assign({}, d, {
+      contas: (d.contas || []).map(c => {
+        if (c.id !== id) return c;
+        const nova = Object.assign({}, c, { [campo]: valor });
+        if (campo !== "codigo") {
+          const automatico = paraCodigo((nova.titularidade || "PF") + "-" + (nova.banco || nova.nome || "CONTA"));
+          const anterior = paraCodigo((c.titularidade || "PF") + "-" + (c.banco || c.nome || "CONTA"));
+          if (!c.codigo || c.codigo === anterior) nova.codigo = automatico;
+        }
+        return nova;
+      })
+    }));
+
+  const exportar = () => {
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "prumo-dados-" + dataHojeISO() + ".json";
+    a.click();
+  };
+  const importar = (ev) => {
+    const arq = ev.target.files && ev.target.files[0];
+    if (!arq) return;
+    const fr = new FileReader();
+    fr.onload = () => {
+      try {
+        const env = normalizarEnvelope(JSON.parse(fr.result));
+        alterar(() => env);
+        setMsg("Arquivo carregado: " + env.lancamentos.length + " lançamento(s).");
+      } catch (e) { setMsg("Não consegui ler esse arquivo."); }
+    };
+    fr.readAsText(arq);
+    ev.target.value = "";
+  };
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-base font-bold">Ajustes</h2>
+
+      {msg ? <Faixa tom="aviso">{msg}</Faixa> : null}
+
+      <Secao titulo="Dropbox" icone={IconCloud}
+             sub="É onde o arquivo de dados fica e onde a chave da API viaja entre as versões. Pasta própria do app — não a dos fretes.">
+        <div className="space-y-3">
+          <Campo label="App Key do app do Dropbox"
+                 dica="Criada de graça no painel de desenvolvedores do Dropbox, com acesso do tipo “App folder”.">
+            <Entrada value={appKey} onChange={(e) => setAppKey(e.target.value.trim())} placeholder="ex.: a1b2c3d4e5f6g7h" />
+          </Campo>
+          <Campo label="Endereço de retorno (Redirect URI) — tem que estar cadastrado igualzinho"
+                 dica="Cole este endereço em OAuth 2 → Redirect URIs, no app do Dropbox.">
+            <div className="flex gap-2">
+              <Entrada readOnly value={redirect} />
+              <Botao tom="neutro" titulo="Copiar"
+                     onClick={() => { try { navigator.clipboard.writeText(redirect); setMsg("Endereço copiado."); } catch (e) { setMsg(redirect); } }}>
+                <IconCopy size={15} />
+              </Botao>
+            </div>
+          </Campo>
+          <div className="flex flex-wrap items-center gap-2">
+            {conectado ? (
+              <>
+                <span className="text-[13px]" style={{ color: "var(--ok-claro)" }}>● Conectado</span>
+                <Botao tom="neutro" onClick={async () => { const p = await dropboxGarantirPastas(codigos); setMsg("Pastas conferidas: " + p.join(", ")); }}>
+                  <IconFolder size={15} /> Criar as pastas dos bancos
+                </Botao>
+                <Botao tom="perigo" onClick={() => { dropboxDesconectar(); setMsg("Desconectado. Recarregue para começar de novo."); }}>Desconectar</Botao>
+              </>
+            ) : (
+              <Botao tom="acento" disabled={!appKey} onClick={() => dropboxIniciarLogin(appKey)}>
+                <IconCloud size={15} /> Conectar o Dropbox
+              </Botao>
+            )}
+          </div>
+          <div className="text-[12px]" style={{ color: "var(--suave)" }}>
+            Estado da carga: {statusCarga === "nuvem" ? "dados vindos do Dropbox"
+              : statusCarga === "local" ? "só o arquivo do navegador (Dropbox desconectado)"
+              : statusCarga === "carregando" ? "carregando..." : statusCarga === "erro" ? "falhou" : "iniciando"}
+            {statusSalvar ? " · gravação: " + (statusSalvar === "salvo" ? "salvo no Dropbox" : statusSalvar === "salvando" ? "salvando..." : statusSalvar === "erro" ? "falhou" : "só local") : ""}
+          </div>
+          {erroCarga ? <Faixa tom="erro">{erroCarga} <button className="underline" onClick={recarregar}>Tentar de novo</button></Faixa> : null}
+        </div>
+      </Secao>
+
+      <Secao titulo="Onde mandar os arquivos" icone={IconFolder}
+             sub="Dentro da pasta do app no Dropbox (Aplicativos → Prumo). Extrato, fatura, comprovante, contrato de financiamento e print de aplicação — tudo entra pelas mesmas pastas.">
+        <div className="space-y-1.5 text-[13px]">
+          <div className="font-mono px-2 py-1 rounded" style={{ background: "var(--barra)" }}>/ENTRADA</div>
+          <div className="text-[12px] pl-2" style={{ color: "var(--suave)" }}>
+            caixa geral: jogue aqui quando não quiser pensar. O app lê o documento e descobre de qual banco é.
+          </div>
+          {codigos.length ? codigos.map(c => (
+            <div key={c}>
+              <div className="font-mono px-2 py-1 rounded" style={{ background: "var(--barra)" }}>/ENTRADA/{c}</div>
+            </div>
+          )) : (
+            <div className="text-[12px] pl-2" style={{ color: "var(--suave)" }}>
+              Cadastre as contas abaixo e cada uma ganha a sua pasta aqui.
+            </div>
+          )}
+          <div className="text-[12px] pl-2" style={{ color: "var(--suave)" }}>
+            uma por conta: o que cai aqui já entra com o banco certo, sem depender da leitura.
+          </div>
+          <div className="font-mono px-2 py-1 rounded mt-2" style={{ background: "var(--barra)" }}>/LANCADOS</div>
+          <div className="text-[12px] pl-2" style={{ color: "var(--suave)" }}>
+            para onde o app move o arquivo depois de lançado. Você não mexe aqui.
+          </div>
+        </div>
+      </Secao>
+
+      <Secao titulo="Chave da API da Anthropic" icone={IconSettings}
+             sub="Guardada no arquivo do Dropbox, nunca no código — o repositório do GitHub Pages é público. É ela que faz a leitura dos documentos por IA.">
+        <div className="flex flex-wrap gap-2 items-end">
+          <div className="flex-1" style={{ minWidth: 220 }}>
+            <Campo label="Chave">
+              <Entrada type={mostrarChave ? "text" : "password"} value={apiKey}
+                       onChange={(e) => setApiKey(e.target.value.trim())} placeholder="sk-ant-..." />
+            </Campo>
+          </div>
+          <Botao tom="neutro" onClick={() => setMostrarChave(v => !v)}>{mostrarChave ? "Ocultar" : "Mostrar"}</Botao>
+          <Botao tom="acento" onClick={() => { alterar(d => Object.assign({}, d, { config: Object.assign({}, d.config, { apiKey: apiKey }) })); setMsg("Chave guardada no arquivo de dados."); }}>
+            <IconCheck size={15} /> Guardar
+          </Botao>
+        </div>
+      </Secao>
+
+      <Secao titulo="Contas" icone={IconBank}
+             sub="Uma linha por conta, marcando PF ou PJ. O código é o nome da pasta no Dropbox e a etiqueta na tela.">
+        <div className="space-y-2">
+          {(dados.contas || []).map(c => (
+            <div key={c.id} className="p-2 rounded-md space-y-2" style={{ border: "1px solid var(--linha)" }}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <SeletorTitular valor={c.titularidade} onValor={(v) => mudarContaComCodigo(c.id, "titularidade", v)} />
+                <span className="text-[11px] font-mono px-2 py-1 rounded" style={{ background: "var(--barra)", color: "var(--suave)" }}>
+                  /ENTRADA/{c.codigo || "—"}
+                </span>
+                <Botao tom="perigo" className="ml-auto" onClick={() => delLista("contas", c.id)} titulo="Remover"><IconTrash size={15} /></Botao>
+              </div>
+              <div className="grade-cad">
+                <Campo label="Nome"><Entrada value={c.nome} onChange={(e) => mudarContaComCodigo(c.id, "nome", e.target.value)} placeholder="Ex.: Conta corrente" /></Campo>
+                <Campo label="Banco"><Entrada value={c.banco} onChange={(e) => mudarContaComCodigo(c.id, "banco", e.target.value)} placeholder="Ex.: Itaú" /></Campo>
+                <Campo label="Tipo">
+                  <Selecao value={c.tipo} onChange={(e) => mudarLista("contas", c.id, "tipo", e.target.value)}>
+                    <option value="corrente">Corrente</option>
+                    <option value="poupanca">Poupança</option>
+                    <option value="pagamento">Conta de pagamento</option>
+                  </Selecao>
+                </Campo>
+                <Campo label="Saldo inicial (R$)" dica="O ponto de partida do saldo acumulado do extrato.">
+                  <Entrada inputMode="decimal" value={String(c.saldoInicial == null ? "" : c.saldoInicial)}
+                           onChange={(e) => mudarLista("contas", c.id, "saldoInicial", paraNumero(e.target.value))} />
+                </Campo>
+                <Campo label="Código da pasta" dica="Só mexa se dois bancos derem o mesmo código.">
+                  <Entrada value={c.codigo || ""} onChange={(e) => mudarLista("contas", c.id, "codigo", paraCodigo(e.target.value))} />
+                </Campo>
+              </div>
+            </div>
+          ))}
+          <Botao tom="neutro" onClick={() => addLista("contas", novaConta())}><IconPlus size={15} /> Adicionar conta</Botao>
+        </div>
+      </Secao>
+
+      <Secao titulo="Cartões de crédito" icone={IconCard} sub="Fechamento e vencimento entram aqui — é o que a fatura vai usar para saber em que mês cada compra cai.">
+        <div className="space-y-2">
+          {(dados.cartoes || []).map(c => (
+            <div key={c.id} className="p-2 rounded-md space-y-2" style={{ border: "1px solid var(--linha)" }}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <SeletorTitular valor={c.titularidade} onValor={(v) => mudarLista("cartoes", c.id, "titularidade", v)} />
+                <Botao tom="perigo" className="ml-auto" onClick={() => delLista("cartoes", c.id)} titulo="Remover"><IconTrash size={15} /></Botao>
+              </div>
+              <div className="grade-cad">
+                <Campo label="Nome"><Entrada value={c.nome} onChange={(e) => mudarLista("cartoes", c.id, "nome", e.target.value)} placeholder="Ex.: Cartão principal" /></Campo>
+                <Campo label="Banco"><Entrada value={c.banco} onChange={(e) => mudarLista("cartoes", c.id, "banco", e.target.value)} placeholder="Ex.: Nubank" /></Campo>
+                <Campo label="Dia do fechamento"><Entrada type="number" min="1" max="31" value={String(c.diaFechamento == null ? 1 : c.diaFechamento)} onChange={(e) => mudarLista("cartoes", c.id, "diaFechamento", Number(e.target.value) || 1)} /></Campo>
+                <Campo label="Dia do vencimento"><Entrada type="number" min="1" max="31" value={String(c.diaVencimento == null ? 10 : c.diaVencimento)} onChange={(e) => mudarLista("cartoes", c.id, "diaVencimento", Number(e.target.value) || 10)} /></Campo>
+                <Campo label="Limite (R$)"><Entrada inputMode="decimal" value={String(c.limite == null ? "" : c.limite)} onChange={(e) => mudarLista("cartoes", c.id, "limite", paraNumero(e.target.value))} /></Campo>
+                <Campo label="Debita na conta">
+                  <Selecao value={c.contaDebitoId || ""} onChange={(e) => mudarLista("cartoes", c.id, "contaDebitoId", e.target.value)}>
+                    <option value="">— nenhuma —</option>
+                    {(dados.contas || []).map(x => <option key={x.id} value={x.id}>{x.nome || "(sem nome)"}</option>)}
+                  </Selecao>
+                </Campo>
+              </div>
+            </div>
+          ))}
+          <Botao tom="neutro" onClick={() => addLista("cartoes", novoCartao())}><IconPlus size={15} /> Adicionar cartão</Botao>
+        </div>
+      </Secao>
+
+      <Secao titulo="Aplicações" icone={IconCofre}
+             sub="Investimento não é lançamento — é patrimônio. O saldo entra por atualização (na v3, direto do print da tela do banco).">
+        <div className="space-y-2">
+          {(dados.aplicacoes || []).map(a => (
+            <div key={a.id} className="p-2 rounded-md space-y-2" style={{ border: "1px solid var(--linha)" }}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <SeletorTitular valor={a.titularidade} onValor={(v) => mudarLista("aplicacoes", a.id, "titularidade", v)} />
+                <span className="text-[12px]" style={{ color: "var(--suave)" }}>
+                  saldo atual {currency(saldoAplicacao(a))}{dataSaldoAplicacao(a) ? " · de " + dataCurta(dataSaldoAplicacao(a)) : ""}
+                </span>
+                <Botao tom="perigo" className="ml-auto" onClick={() => delLista("aplicacoes", a.id)} titulo="Remover"><IconTrash size={15} /></Botao>
+              </div>
+              <div className="grade-cad">
+                <Campo label="Nome"><Entrada value={a.nome} onChange={(e) => mudarLista("aplicacoes", a.id, "nome", e.target.value)} placeholder="Ex.: CDB liquidez diária" /></Campo>
+                <Campo label="Banco"><Entrada value={a.banco} onChange={(e) => mudarLista("aplicacoes", a.id, "banco", e.target.value)} placeholder="Ex.: Itaú" /></Campo>
+                <Campo label="Tipo">
+                  <Selecao value={a.tipo} onChange={(e) => mudarLista("aplicacoes", a.id, "tipo", e.target.value)}>
+                    {["CDB","Poupança","Fundo","Tesouro Direto","LCI/LCA","Ações","Outro"].map(t => <option key={t} value={t}>{t}</option>)}
+                  </Selecao>
+                </Campo>
+                <Campo label="Ligada à conta">
+                  <Selecao value={a.contaId || ""} onChange={(e) => mudarLista("aplicacoes", a.id, "contaId", e.target.value)}>
+                    <option value="">— nenhuma —</option>
+                    {(dados.contas || []).map(x => <option key={x.id} value={x.id}>{x.nome || "(sem nome)"}</option>)}
+                  </Selecao>
+                </Campo>
+              </div>
+            </div>
+          ))}
+          <Botao tom="neutro" onClick={() => addLista("aplicacoes", novaAplicacao())}><IconPlus size={15} /> Adicionar aplicação</Botao>
+        </div>
+      </Secao>
+
+      <Secao titulo="Categorias" icone={IconTag}
+             sub="“Repete por natureza” marca o que acontece duas vezes no mesmo dia de verdade (mercado, combustível, refeição). Essas nunca vêm pré-marcadas na tela de duplicados.">
+        <div className="space-y-1.5">
+          {(dados.categorias || []).map(c => (
+            <div key={c.id} className="flex items-center gap-2 flex-wrap p-2 rounded-md" style={{ border: "1px solid var(--linha)" }}>
+              <input type="color" value={c.cor || "#64748B"} onChange={(e) => mudarLista("categorias", c.id, "cor", e.target.value)}
+                     style={{ width: 28, height: 28, background: "transparent", border: "0", padding: 0 }} title="Cor" />
+              <Entrada value={c.nome} onChange={(e) => mudarLista("categorias", c.id, "nome", e.target.value)}
+                       style={{ flex: "1 1 140px", width: "auto" }} placeholder="Nome da categoria" />
+              <Selecao value={c.tipo} onChange={(e) => mudarLista("categorias", c.id, "tipo", e.target.value)} style={{ width: "auto" }}>
+                <option value="despesa">Despesa</option>
+                <option value="receita">Receita</option>
+              </Selecao>
+              <label className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--suave)" }}>
+                <input type="checkbox" checked={!!c.repetitiva} onChange={(e) => mudarLista("categorias", c.id, "repetitiva", e.target.checked)} />
+                repete por natureza
+              </label>
+              <Botao tom="perigo" onClick={() => delLista("categorias", c.id)} titulo="Remover"><IconTrash size={15} /></Botao>
+            </div>
+          ))}
+          <div className="flex gap-2 pt-1">
+            <Botao tom="neutro" onClick={() => addLista("categorias", novaCategoria())}><IconPlus size={15} /> Adicionar categoria</Botao>
+            <Botao tom="neutro" onClick={() => alterar(d => Object.assign({}, d, { categorias: categoriasIniciais() }))}>
+              <IconRefresh size={15} /> Voltar à lista padrão
+            </Botao>
+          </div>
+        </div>
+      </Secao>
+
+      <Secao titulo="Procurar duplicados" icone={IconAlert}
+             sub="A varredura completa da base. Serve para o caso de a mesma compra ter entrado pela foto e pela linha do extrato.">
+        <PainelDuplicados dados={dados} onRemover={(ids) => {
+          alterar(d => Object.assign({}, d, { lancamentos: (d.lancamentos || []).filter(l => ids.indexOf(l.id) < 0) }));
+          setMsg(ids.length + " lançamento(s) apagado(s).");
+        }} />
+      </Secao>
+
+      <Secao titulo="Dados e versão" icone={IconGrid}>
+        <div className="flex flex-wrap gap-2 items-center">
+          <Botao tom="neutro" onClick={exportar}><IconDownload size={15} /> Baixar cópia (.json)</Botao>
+          <label className="inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold cursor-pointer"
+                 style={{ background: "var(--superficie)", color: "var(--texto)", border: "1px solid var(--borda)" }}>
+            <IconUpload size={15} /> Carregar cópia
+            <input type="file" accept="application/json,.json" onChange={importar} style={{ display: "none" }} />
+          </label>
+          <Botao tom="neutro" onClick={() => { salvarAgora(); setMsg("Gravação enviada ao Dropbox."); }}><IconCheck size={15} /> Salvar agora</Botao>
+          <Botao tom="neutro" onClick={recarregar}><IconRefresh size={15} /> Recarregar do Dropbox</Botao>
+          <Botao tom="neutro" onClick={() => { try { localStorage.removeItem(LS_KEYS.cacheIa); setMsg("Cache de leitura por IA limpo."); } catch (e) {} }}>
+            Limpar cache de leitura
+          </Botao>
+        </div>
+        <div className="text-[12px] mt-3" style={{ color: "var(--suave)" }}>
+          {NOME_APP} {APP_VERSION} · {(dados.lancamentos || []).length} lançamento(s) ·
+          {" "}{(dados.contas || []).length} conta(s) · {(dados.contratos || []).length} contrato(s) ·
+          {" "}último salvamento: {dados.salvoEm ? new Date(dados.salvoEm).toLocaleString("pt-BR") : "nunca"}
+        </div>
+      </Secao>
+    </div>
+  );
+}
+
+
+/* ===========================================================
+   RAIZ — casca do app, abas e o retorno do Dropbox
+=========================================================== */
+function App() {
+  const { dados, alterar, dadosProntos, statusCarga, statusSalvar, erroCarga, recarregar, salvarAgora } = useDados();
+  const [aba, setAba] = useState("resumo");
+  const [mes, setMes] = useState(mesHoje());
+  const [modal, setModal] = useState(null); // null | { inicial }
+  const [avisoDbx, setAvisoDbx] = useState("");
+
+  // A lista mais fresca, para a segunda checagem de duplicidade no
+  // instante do clique — nunca uma copia presa numa renderizacao antiga.
+  const refLancamentos = useRef(dados.lancamentos || []);
+  useEffect(() => { refLancamentos.current = dados.lancamentos || []; }, [dados.lancamentos]);
+
+  // Retorno do Dropbox: o ?code= chega aqui porque o carregador repassa
+  // location.search e location.hash para o app.html.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code) return;
+    (async () => {
+      const ok = await dropboxTrocarCodigoPorToken(code);
+      // limpa o endereco para o codigo nao ser reaproveitado num F5
+      const limpo = window.location.origin + window.location.pathname;
+      try { window.history.replaceState({}, "", limpo); } catch (e) {}
+      if (ok) {
+        const codigos = (lsGet(LS_KEYS.dados) || {}).contas || [];
+        await dropboxGarantirPastas(codigos.map(c => c.codigo).filter(Boolean));
+        setAvisoDbx(""); recarregar();
+      }
+      else setAvisoDbx("O Dropbox recusou a autorização. Confira se o endereço de retorno cadastrado é exatamente " + dropboxRedirectUri());
+    })();
+  }, [recarregar]);
+
+  const salvarLancamento = (l) => {
+    alterar(d => {
+      const existe = (d.lancamentos || []).some(x => x.id === l.id);
+      return Object.assign({}, d, {
+        lancamentos: existe ? d.lancamentos.map(x => x.id === l.id ? l : x) : (d.lancamentos || []).concat([l])
+      });
+    });
+    setMes(mesDaData(l.data));
+    setModal(null);
+  };
+  const excluirLancamento = (id) => {
+    alterar(d => Object.assign({}, d, { lancamentos: (d.lancamentos || []).filter(x => x.id !== id) }));
+    setModal(null);
+  };
+
+  const ABAS = [
+    { id: "resumo", rotulo: "Resumo", icone: IconGrid },
+    { id: "bancos", rotulo: "Bancos", icone: IconBank },
+    { id: "lancamentos", rotulo: "Lançamentos", icone: IconList },
+    { id: "contratos", rotulo: "Contratos", icone: IconContrato },
+    { id: "config", rotulo: "Ajustes", icone: IconSettings }
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--fundo)" }}>
+      <AvisoVersaoNova />
+
+      <header className="no-print" style={{ background: "var(--barra)", borderBottom: "1px solid var(--borda)" }}>
+        <div className="mx-auto max-w-5xl px-3 py-2.5 flex items-center gap-2.5">
+          <LogoMark size={26} />
+          <div className="flex-1">
+            <div className="text-[15px] font-bold leading-none" style={{ color: "var(--na-barra)", fontFamily: "'Oswald', sans-serif", letterSpacing: ".06em", textTransform: "uppercase" }}>
+              {NOME_APP}
+            </div>
+            <div className="text-[10px] mt-0.5" style={{ color: "var(--na-barra-suave)" }}>controle de finanças pessoais</div>
+          </div>
+          <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded"
+                style={{ color: "var(--sobre-acento)", background: "var(--acento-vivo)", fontFamily: "'JetBrains Mono', monospace" }}>
+            {APP_VERSION}
+          </span>
+        </div>
+        <div className="mx-auto max-w-5xl px-3 pb-2 flex gap-1.5 overflow-x-auto">
+          {ABAS.map(a => {
+            const ativa = aba === a.id;
+            return (
+              <button key={a.id} onClick={() => setAba(a.id)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold whitespace-nowrap"
+                style={{
+                  background: ativa ? "var(--aba-ativa-bg)" : "transparent",
+                  color: ativa ? "var(--aba-ativa-txt)" : "var(--na-barra-suave)",
+                  border: "1px solid " + (ativa ? "var(--aba-ativa-txt)" : "transparent")
+                }}>
+                <a.icone size={14} /> {a.rotulo}
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-3 py-4 space-y-3" style={{ paddingBottom: 90 }}>
+        {!dadosProntos && statusCarga === "carregando" ? (
+          <Faixa tom="aviso">
+            <span className="inline-flex items-center gap-2"><IconLoader size={14} /> Carregando os lançamentos do Dropbox. O botão de lançar só liga quando terminar.</span>
+          </Faixa>
+        ) : null}
+        {!dadosProntos && statusCarga === "erro" ? (
+          <Faixa tom="erro">
+            {erroCarga} <b>O lançamento fica travado</b> até os dados chegarem — é o que impede lançar em cima de uma lista vazia e duplicar tudo.{" "}
+            <button className="underline" onClick={recarregar}>Tentar de novo</button>
+          </Faixa>
+        ) : null}
+        {avisoDbx ? <Faixa tom="erro">{avisoDbx}</Faixa> : null}
+        {!dropboxEstaConectado() ? (
+          <Faixa tom="aviso">
+            O Dropbox ainda não está conectado. Enquanto isso os lançamentos ficam só neste navegador.
+            Vá em <b>Ajustes → Dropbox</b> para conectar.
+          </Faixa>
+        ) : null}
+
+        {aba === "resumo" ? <AbaResumo dados={dados} mes={mes} onMes={setMes} /> : null}
+        {aba === "bancos" ? <AbaBancos dados={dados} alterar={alterar} mes={mes} /> : null}
+        {aba === "contratos" ? <AbaContratos dados={dados} alterar={alterar} /> : null}
+        {aba === "lancamentos" ? (
+          <AbaLancamentos dados={dados} mes={mes} onMes={setMes} dadosProntos={dadosProntos}
+                          onNovo={() => setModal({ inicial: null })}
+                          onEditar={(l) => setModal({ inicial: l })} />
+        ) : null}
+        {aba === "config" ? (
+          <AbaConfig dados={dados} alterar={alterar} statusCarga={statusCarga} statusSalvar={statusSalvar}
+                     erroCarga={erroCarga} recarregar={recarregar} salvarAgora={salvarAgora} />
+        ) : null}
+      </main>
+
+      {modal ? (
+        <ModalLancamento inicial={modal.inicial} dados={dados} refLancamentos={refLancamentos}
+                         dadosProntos={dadosProntos} onSalvar={salvarLancamento}
+                         onExcluir={excluirLancamento} onClose={() => setModal(null)} />
+      ) : null}
+
+      {/* O botao redondo fica so no Resumo: na aba de Lancamentos ja existe
+          o "Novo" no alto, e dois botoes iguais atrapalham a leitura da lista. */}
+      {aba === "resumo" ? (
+        <button onClick={() => setModal({ inicial: null })} disabled={!dadosProntos}
+          title={dadosProntos ? "Novo lançamento" : "Carregando lançamentos..."}
+          className="no-print fixed rounded-full flex items-center justify-center"
+          style={{
+            right: 18, bottom: 22, width: 54, height: 54,
+            background: dadosProntos ? "var(--acento)" : "var(--borda)",
+            color: "#FFFFFF", border: 0, boxShadow: "0 6px 18px rgba(0,0,0,.45)",
+            cursor: dadosProntos ? "pointer" : "not-allowed"
+          }}>
+          {dadosProntos ? <IconPlus size={24} /> : <IconLoader size={22} />}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+</script>
+<script>
+  (function () {
+    var source = document.getElementById("app-source").textContent;
+    var output = Babel.transform(source, {
+      presets: [["react", { runtime: "classic" }], "env"]
+    }).code;
+    var el = document.createElement("script");
+    el.textContent = output;
+    document.body.appendChild(el);
+  })();
+</script>
+</body>
+</html>
