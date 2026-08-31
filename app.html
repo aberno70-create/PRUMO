@@ -139,7 +139,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
    Painel de Bordo: carregador + app.html, auto-atualizacao,
    Dropbox por PKCE e leitura de documento por IA.
 =========================================================== */
-const APP_VERSION = "v5";
+const APP_VERSION = "v6";
 const NOME_APP = "Prumo";
 
 /* ===========================================================
@@ -686,7 +686,7 @@ function normalizarEnvelope(bruto) {
   if (!bruto || typeof bruto !== "object") return base;
   const arr = (x) => (Array.isArray(x) ? x : []);
   // Conta e cartao de arquivo antigo entram como PF, que era o unico caso.
-  const contas = arr(bruto.contas).map(c => Object.assign({ titularidade: "PF" }, c,
+  const contas = arr(bruto.contas).map(c => Object.assign({ titularidade: "PF", limiteCredito: 0 }, c,
     { codigo: c.codigo || paraCodigo((c.titularidade || "PF") + "-" + (c.banco || c.nome || "CONTA")) }));
   /* O cartao tambem ganha codigo: ele tem pasta propria no Dropbox,
      porque as faturas sao varias e chegam separadas por cartao. */
@@ -972,6 +972,41 @@ function extratoDaConta(conta, lancamentos, ateData) {
 function saldoDaConta(conta, lancamentos, ateData) {
   const linhas = extratoDaConta(conta, lancamentos, ateData);
   return linhas.length ? linhas[linhas.length - 1].saldo : (Number(conta.saldoInicial) || 0);
+}
+
+/* ===========================================================
+   LIMITE DE CREDITO DA CONTA (cheque especial)
+   O saldo negativo ja entra na situacao liquida como negativo —
+   o limite nao e dinheiro seu, e divida esperando acontecer. O que
+   falta e enxergar quanto dele ja foi consumido e quanto ainda da
+   para gastar antes de estourar.
+=========================================================== */
+function usoDoLimite(conta, lancamentos) {
+  const saldo = saldoDaConta(conta, lancamentos);
+  const limite = Number(conta.limiteCredito) || 0;
+  const usado = saldo < 0 ? Math.min(-saldo, limite) : 0;
+  const estouro = saldo < 0 ? Math.max(0, -saldo - limite) : 0;
+  return {
+    saldo: saldo,
+    limite: limite,
+    usado: usado,
+    estouro: estouro,                       // passou do limite: o banco recusa ou cobra caro
+    sobrando: Math.max(0, limite - usado),  // quanto do limite ainda da para usar
+    disponivel: saldo + limite,             // o que da para gastar hoje, contando o limite
+    pct: limite ? Math.min(100, (usado / limite) * 100) : 0,
+    negativo: saldo < 0
+  };
+}
+
+/* Somatorio do limite de um conjunto de contas. */
+function resumoLimites(contas, lancamentos) {
+  return (contas || []).reduce((acc, c) => {
+    const u = usoDoLimite(c, lancamentos);
+    acc.limite += u.limite; acc.usado += u.usado; acc.estouro += u.estouro;
+    acc.disponivel += u.disponivel;
+    if (u.limite > 0) acc.comLimite += 1;
+    return acc;
+  }, { limite: 0, usado: 0, estouro: 0, disponivel: 0, comLimite: 0 });
 }
 
 /* ===========================================================
@@ -1793,6 +1828,10 @@ function AbaBancos({ dados, alterar, mes }) {
   const faturaAberta = totalFaturasAbertas(cartoes, dados.lancamentos);
   const divida = contratos.reduce((s, c) => s + resumoContrato(c).saldoDevedor, 0);
   const liquido = emConta + aplicado - faturaAberta - divida;
+  /* O limite nao entra na situacao liquida: nao e dinheiro seu. Ele
+     entra numa linha propria, para responder "quanto da para gastar
+     hoje" sem confundir com "quanto eu tenho". */
+  const lim = resumoLimites(contas, dados.lancamentos);
 
   /* Cada banco vira um bloco, com as contas, aplicacoes e contratos
      que estao dentro dele. */
@@ -1843,6 +1882,21 @@ function AbaBancos({ dados, alterar, mes }) {
         <div className="text-[11px] mt-1" style={{ color: "var(--suave)" }}>
           em conta + aplicado − fatura aberta − saldo devedor dos contratos
         </div>
+        {lim.limite > 0 ? (
+          <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--linha)" }}>
+            <div className="flex items-baseline justify-between gap-2 text-[13px] flex-wrap">
+              <span style={{ color: "var(--suave)" }}>
+                Limite de crédito em {lim.comLimite} conta(s): usado {currency(lim.usado)} de {currency(lim.limite)}
+              </span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", color: lim.disponivel >= 0 ? "var(--texto)" : "var(--erro-claro)" }}>
+                dá para gastar {currency(lim.disponivel)}
+              </span>
+            </div>
+            <div className="text-[11px] mt-1" style={{ color: "var(--suave)" }}>
+              o limite não entra na situação líquida — é dívida esperando acontecer, não dinheiro seu
+            </div>
+          </div>
+        ) : null}
       </Cartao>
 
       {bancos.length === 0 ? (
@@ -1857,6 +1911,7 @@ function AbaBancos({ dados, alterar, mes }) {
 
           {b.contas.map(c => {
             const saldo = saldoDaConta(c, dados.lancamentos);
+            const u = usoDoLimite(c, dados.lancamentos);
             const cob = coberturaDaConta(c.id, dados.coberturas);
             const furos = furosDaConta(c.id, dados.coberturas);
             return (
@@ -1870,6 +1925,29 @@ function AbaBancos({ dados, alterar, mes }) {
                     {currency(saldo)}
                   </span>
                 </div>
+                {u.limite > 0 ? (
+                  <div className="mt-1.5">
+                    <div className="flex items-baseline justify-between gap-2 text-[11px]" style={{ color: "var(--suave)" }}>
+                      <span>
+                        {u.negativo
+                          ? "usando " + currency(u.usado) + " do limite de " + currency(u.limite)
+                          : "limite de " + currency(u.limite) + " intacto"}
+                      </span>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>dá para gastar {currency(u.disponivel)}</span>
+                    </div>
+                    <div style={{ height: 6, background: "var(--linha)", borderRadius: 3, marginTop: 3 }}>
+                      <div className="barra-dado" style={{ width: Math.max(u.pct, u.usado > 0 ? 2 : 0) + "%", height: 6, borderRadius: 3,
+                        background: u.pct > 80 ? "var(--perigo)" : "var(--acento)" }} />
+                    </div>
+                  </div>
+                ) : null}
+                {u.estouro > 0 ? (
+                  <div className="mt-1.5">
+                    <Faixa tom="erro">
+                      Passou do limite em {currency(u.estouro)}. Daqui para frente o banco recusa ou cobra juros de cheque especial.
+                    </Faixa>
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-2 flex-wrap mt-1">
                   <span className="text-[11px]" style={{ color: "var(--suave)" }}>
                     {cob ? "extrato de " + dataCurta(cob.de) + " a " + dataCurta(cob.ate) + " (" + cob.quantos + " arquivo(s))" : "nenhum extrato importado"}
@@ -2023,6 +2101,29 @@ function ExtratoDaConta({ conta, dados, onVoltar }) {
           {currency(saldoDaConta(conta, dados.lancamentos))}
         </span>
       </div>
+
+      {(() => {
+        const u = usoDoLimite(conta, dados.lancamentos);
+        if (!u.limite) return null;
+        return (
+          <Cartao className="p-3">
+            <div className="flex items-baseline justify-between gap-2 text-[13px] flex-wrap">
+              <span style={{ color: "var(--suave)" }}>
+                {u.negativo ? "Usando " + currency(u.usado) + " do limite de " + currency(u.limite)
+                            : "Limite de " + currency(u.limite) + " sem uso"}
+              </span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>dá para gastar {currency(u.disponivel)}</span>
+            </div>
+            <div style={{ height: 8, background: "var(--linha)", borderRadius: 4, marginTop: 6 }}>
+              <div className="barra-dado" style={{ width: Math.max(u.pct, u.usado > 0 ? 2 : 0) + "%", height: 8, borderRadius: 4,
+                background: u.pct > 80 ? "var(--perigo)" : "var(--acento)" }} />
+            </div>
+            {u.estouro > 0 ? (
+              <div className="mt-2"><Faixa tom="erro">Passou do limite em {currency(u.estouro)}.</Faixa></div>
+            ) : null}
+          </Cartao>
+        );
+      })()}
 
       {furos.length ? (
         <Faixa tom="erro">
@@ -3011,7 +3112,7 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
      varias e chegam separadas. */
   const codigos = (dados.contas || []).concat(dados.cartoes || []).map(c => c.codigo).filter(Boolean);
 
-  const novaConta  = () => ({ id: uid(), nome: "", banco: "", tipo: "corrente", titularidade: "PF", codigo: "", saldoInicial: 0, ativa: true });
+  const novaConta  = () => ({ id: uid(), nome: "", banco: "", tipo: "corrente", titularidade: "PF", codigo: "", saldoInicial: 0, limiteCredito: 0, ativa: true });
   const novoCartao = () => ({ id: uid(), nome: "", banco: "", titularidade: "PF", codigo: "", limite: 0, diaFechamento: 1, diaVencimento: 10, contaDebitoId: "", ativo: true });
   const novaCategoria = () => ({ id: uid(), nome: "", tipo: "despesa", icone: "outros",
     cor: CORES_CAT[Math.floor(Math.random() * CORES_CAT.length)], repetitiva: false, ativa: true });
@@ -3184,7 +3285,7 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
       </Secao>
 
       <Secao titulo="Contas" icone={IconBank}
-             sub="Uma linha por conta, marcando PF ou PJ. O código é o nome da pasta no Dropbox e a etiqueta na tela.">
+             sub="Uma linha por conta, marcando PF ou PJ. O código é o nome da pasta no Dropbox. O limite de crédito é o cheque especial: ele não entra como dinheiro seu, só mostra quanto ainda dá para gastar antes de estourar.">
         <div className="space-y-2">
           {(dados.contas || []).map(c => (
             <div key={c.id} className="p-2 rounded-md space-y-2" style={{ border: "1px solid var(--linha)" }}>
@@ -3208,6 +3309,10 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
                 <Campo label="Saldo inicial (R$)" dica="O ponto de partida do saldo acumulado do extrato.">
                   <Entrada inputMode="decimal" value={String(c.saldoInicial == null ? "" : c.saldoInicial)}
                            onChange={(e) => mudarLista("contas", c.id, "saldoInicial", paraNumero(e.target.value))} />
+                </Campo>
+                <Campo label="Limite de crédito (R$)" dica="O cheque especial da conta. Deixe 0 se não tiver.">
+                  <Entrada inputMode="decimal" value={String(c.limiteCredito == null ? "" : c.limiteCredito)}
+                           onChange={(e) => mudarLista("contas", c.id, "limiteCredito", paraNumero(e.target.value))} />
                 </Campo>
                 <Campo label="Código da pasta" dica="Só mexa se dois bancos derem o mesmo código.">
                   <Entrada value={c.codigo || ""} onChange={(e) => mudarLista("contas", c.id, "codigo", paraCodigo(e.target.value))} />
