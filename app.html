@@ -139,7 +139,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
    Painel de Bordo: carregador + app.html, auto-atualizacao,
    Dropbox por PKCE e leitura de documento por IA.
 =========================================================== */
-const APP_VERSION = "v6";
+const APP_VERSION = "v7";
 const NOME_APP = "Prumo";
 
 /* ===========================================================
@@ -3506,9 +3506,12 @@ function App() {
     { id: "bancos", rotulo: "Bancos", icone: IconBank },
     { id: "lancamentos", rotulo: "Lançamentos", icone: IconList },
     { id: "graficos", rotulo: "Gráficos", icone: IconTrendUp },
-    { id: "contratos", rotulo: "Contratos", icone: IconContrato },
-    { id: "config", rotulo: "Ajustes", icone: IconSettings }
+    { id: "contratos", rotulo: "Contratos", icone: IconContrato }
   ];
+  /* Ajustes saiu da barra e virou engrenagem fixa no cabecalho: com
+     seis abas a ultima ficava fora da tela no celular e so aparecia
+     arrastando a barra — foi assim que a tela de Ajustes "sumiu". */
+  const noConfig = aba === "config";
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--fundo)" }}>
@@ -3523,6 +3526,17 @@ function App() {
             </div>
             <div className="text-[10px] mt-0.5" style={{ color: "var(--na-barra-suave)" }}>controle de finanças pessoais</div>
           </div>
+          <button onClick={() => setAba(noConfig ? "resumo" : "config")}
+            title="Ajustes" aria-label="Ajustes" aria-pressed={noConfig}
+            className="inline-flex items-center justify-center rounded-md shrink-0"
+            style={{
+              width: 36, height: 36, cursor: "pointer",
+              background: noConfig ? "var(--aba-ativa-bg)" : "transparent",
+              border: "1px solid " + (noConfig ? "var(--aba-ativa-txt)" : "var(--borda)"),
+              color: noConfig ? "var(--aba-ativa-txt)" : "var(--na-barra-suave)"
+            }}>
+            <IconSettings size={19} />
+          </button>
           <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded"
                 style={{ color: "var(--sobre-acento)", background: "var(--acento-vivo)", fontFamily: "'JetBrains Mono', monospace" }}>
             {APP_VERSION}
