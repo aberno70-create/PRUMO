@@ -49,8 +49,36 @@
      fundo escuro (protan/deutan/tritan). Nao trocar sem revalidar. */
   --serie-saiu:#FF1B4C; --serie-entrou:#2B8FEE;
   --grade-eixo:#2A2E3B; --grade-texto:#98A0B0;
+  /* AREA SEGURA do aparelho. No atalho da tela de inicio do iPhone a
+     barra de status (hora, wifi, bateria) fica POR CIMA da pagina —
+     o app ocupa a tela inteira. Sem reservar este espaco, o nome do
+     app fica embaixo do relogio. Depende do viewport-fit=cover que
+     esta no meta la em cima. */
+  --sa-topo:  env(safe-area-inset-top, 0px);
+  --sa-baixo: env(safe-area-inset-bottom, 0px);
+  --sa-esq:   env(safe-area-inset-left, 0px);
+  --sa-dir:   env(safe-area-inset-right, 0px);
 }
   body { margin: 0; font-family: 'Inter', sans-serif; background: var(--fundo); color: var(--texto); }
+
+  /* A faixa escura do cabecalho sobe ate o topo da tela e o conteudo
+     dele comeca abaixo do relogio: a barra de status fica sobre a cor
+     do cabecalho, nao sobre o texto. */
+  .app-topo {
+    padding-top: var(--sa-topo);
+    padding-left: var(--sa-esq);
+    padding-right: var(--sa-dir);
+  }
+  .app-corpo {
+    padding-left: var(--sa-esq);
+    padding-right: var(--sa-dir);
+    padding-bottom: calc(90px + var(--sa-baixo));
+  }
+  /* a barra de gestos do iPhone come o canto de baixo */
+  .botao-flutuante {
+    right:  calc(18px + var(--sa-dir));
+    bottom: calc(22px + var(--sa-baixo));
+  }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 8px; }
 
@@ -139,7 +167,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
    Painel de Bordo: carregador + app.html, auto-atualizacao,
    Dropbox por PKCE e leitura de documento por IA.
 =========================================================== */
-const APP_VERSION = "v7";
+const APP_VERSION = "v8";
 const NOME_APP = "Prumo";
 
 /* ===========================================================
@@ -3517,7 +3545,7 @@ function App() {
     <div style={{ minHeight: "100vh", background: "var(--fundo)" }}>
       <AvisoVersaoNova />
 
-      <header className="no-print" style={{ background: "var(--barra)", borderBottom: "1px solid var(--borda)" }}>
+      <header className="no-print app-topo" style={{ background: "var(--barra)", borderBottom: "1px solid var(--borda)" }}>
         <div className="mx-auto max-w-5xl px-3 py-2.5 flex items-center gap-2.5">
           <LogoMark size={26} />
           <div className="flex-1">
@@ -3560,7 +3588,7 @@ function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-3 py-4 space-y-3" style={{ paddingBottom: 90 }}>
+      <main className="mx-auto max-w-5xl px-3 py-4 space-y-3 app-corpo">
         {!dadosProntos && statusCarga === "carregando" ? (
           <Faixa tom="aviso">
             <span className="inline-flex items-center gap-2"><IconLoader size={14} /> Carregando os lançamentos do Dropbox. O botão de lançar só liga quando terminar.</span>
@@ -3606,9 +3634,9 @@ function App() {
       {aba === "resumo" ? (
         <button onClick={() => setModal({ inicial: null })} disabled={!dadosProntos}
           title={dadosProntos ? "Novo lançamento" : "Carregando lançamentos..."}
-          className="no-print fixed rounded-full flex items-center justify-center"
+          className="no-print fixed rounded-full flex items-center justify-center botao-flutuante"
           style={{
-            right: 18, bottom: 22, width: 54, height: 54,
+            width: 54, height: 54,
             background: dadosProntos ? "var(--acento)" : "var(--borda)",
             color: "#FFFFFF", border: 0, boxShadow: "0 6px 18px rgba(0,0,0,.45)",
             cursor: dadosProntos ? "pointer" : "not-allowed"
