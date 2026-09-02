@@ -117,6 +117,11 @@
       text-transform: uppercase; text-align: left; flex: 0 0 auto; padding-top: 1px;
     }
     .rolagem-resp { overflow-x: visible !important; }
+    /* Celula de texto longo (historico do banco) nao cabe na metade
+       direita da ficha: vira bloco proprio, com o rotulo em cima e o
+       texto alinhado a esquerda, como se le. */
+    table.tab-resp td.celula-larga { display: block; text-align: left !important; }
+    table.tab-resp td.celula-larga::before { display: block; margin-bottom: 2px; }
   }
 
   /* ---------------------------------------------------------------
@@ -167,7 +172,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
    Painel de Bordo: carregador + app.html, auto-atualizacao,
    Dropbox por PKCE e leitura de documento por IA.
 =========================================================== */
-const APP_VERSION = "v8";
+const APP_VERSION = "v9";
 const NOME_APP = "Prumo";
 
 /* ===========================================================
@@ -614,6 +619,42 @@ async function dropboxRpc(endpoint, corpo) {
    ASCII, porque Dropbox-API-Arg e cabecalho HTTP.
    Voce joga o arquivo na pasta do banco e o app ja sabe de quem e;
    se jogar na /ENTRADA solta, o app descobre pelo conteudo. */
+/* Lista os arquivos de uma pasta da caixa de entrada. Pasta que
+   ainda nao existe devolve lista vazia, nao erro. */
+async function dropboxListarPasta(caminho) {
+  const r = await dropboxRpc("files/list_folder", { path: caminho, recursive: false, limit: 200 });
+  if (!r) return [];
+  return (r.entries || [])
+    .filter(e => e[".tag"] === "file")
+    .map(e => ({ nome: e.name, caminho: e.path_lower, tamanho: e.size, em: e.server_modified }))
+    .sort((a, b) => String(b.em).localeCompare(String(a.em)));
+}
+
+/* Baixa o arquivo como bytes. O texto do extrato e decodificado
+   depois (windows-1252 na maioria dos bancos), por isso vem cru. */
+async function dropboxBaixarBytes(caminho) {
+  const token = await dropboxTokenValido();
+  if (!token) throw new Error("SEM_TOKEN");
+  const resp = await fetch("https://content.dropboxapi.com/2/files/download", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Dropbox-API-Arg": dropboxArg({ path: caminho }) }
+  });
+  if (!resp.ok) throw new Error("FALHA_LEITURA");
+  return resp.arrayBuffer();
+}
+
+/* Arquivo lido sai da caixa de entrada e vai para /LANCADOS, para
+   nao ser importado de novo por engano. autorename resolve nome
+   repetido sem perguntar. */
+async function dropboxArquivar(caminho) {
+  const nome = String(caminho).split("/").pop();
+  const destino = PASTA_LANCADOS_DBX + "/" + nome;
+  try {
+    await dropboxRpc("files/move_v2", { from_path: caminho, to_path: destino, autorename: true });
+    return destino;
+  } catch (e) { return ""; }
+}
+
 async function dropboxGarantirPastas(codigos) {
   const alvos = [PASTA_ENTRADA_DBX, PASTA_LANCADOS_DBX];
   (codigos || []).forEach(c => { if (c) alvos.push(PASTA_ENTRADA_DBX + "/" + c); });
@@ -1410,6 +1451,897 @@ function AvisoVersaoNova() {
 
 
 /* ===========================================================
+   LEITURA DE EXTRATO — OFX primeiro, CSV depois.
+   Nada aqui decide sozinho: estas funcoes so ENTENDEM o arquivo
+   e devolvem as linhas. Quem confere duplicidade e quem pergunta
+   e a tela de importacao.
+   Ordem do briefing: OFX (tem FITID, o identificador do banco),
+   depois CSV, e o PDF por ultimo.
+=========================================================== */
+
+/* Extrato de banco brasileiro quase sempre vem em windows-1252
+   por causa dos acentos. Ler como UTF-8 devolve "DESCRI??O" e o
+   estabelecimento normalizado sai errado — o que estraga a
+   conciliacao inteira. */
+function decodificarArquivo(buffer) {
+  const bytes = new Uint8Array(buffer);
+  if (bytes.length > 2 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+    return new TextDecoder("utf-8").decode(bytes.subarray(3));
+  }
+  let utf8 = "";
+  try { utf8 = new TextDecoder("utf-8").decode(bytes); } catch (e) { utf8 = ""; }
+  if (utf8 && utf8.indexOf("�") < 0) return utf8;
+  try { return new TextDecoder("windows-1252").decode(bytes); } catch (e) { return utf8; }
+}
+
+/* Numero do jeito que o banco escreve: "1.234,56", "1234.56",
+   "-1.234,56", "1.234,56 D", "(1.234,56)", "R$ 1.234,56".
+   A regra do separador decimal e a quantidade de casas depois do
+   ULTIMO separador: 1 ou 2 casas e decimal, 3 casas e milhar. */
+function numeroSolto(txt) {
+  if (typeof txt === "number") return txt;
+  let s = String(txt == null ? "" : txt).trim();
+  if (!s) return null;
+  let sinal = 1;
+  if (/^\(.*\)$/.test(s)) { sinal = -1; s = s.slice(1, -1); }
+  const sufixo = s.match(/([DC])\s*$/i);
+  if (sufixo && /[0-9]/.test(s)) { if (sufixo[1].toUpperCase() === "D") sinal = -1; s = s.slice(0, sufixo.index); }
+  s = s.replace(/R\$/gi, "").replace(/[\s ]/g, "");
+  if (s.indexOf("-") >= 0) sinal = -sinal;
+  s = s.replace(/[+\-]/g, "");
+  if (!/^[0-9.,]+$/.test(s) || !/[0-9]/.test(s)) return null;
+
+  const ultVirg = s.lastIndexOf(","), ultPonto = s.lastIndexOf(".");
+  const dec = Math.max(ultVirg, ultPonto);
+  let inteiro = s, fracao = "";
+  if (dec >= 0) {
+    const casas = s.length - dec - 1;
+    if (casas === 1 || casas === 2) { inteiro = s.slice(0, dec); fracao = s.slice(dec + 1); }
+  }
+  inteiro = inteiro.replace(/[.,]/g, "");
+  const n = parseFloat(inteiro + (fracao ? "." + fracao : ""));
+  return isNaN(n) ? null : sinal * n;
+}
+
+/* Data em qualquer um dos formatos que aparecem em extrato:
+   dd/mm/aaaa, dd-mm-aaaa, dd.mm.aa, aaaa-mm-dd, aaaammdd. */
+function dataSolta(txt) {
+  const s = String(txt == null ? "" : txt).trim();
+  if (!s) return "";
+  let m = s.match(/(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if (m) return m[1] + "-" + String(m[2]).padStart(2, "0") + "-" + String(m[3]).padStart(2, "0");
+  m = s.match(/(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/);
+  if (m) {
+    let ano = m[3];
+    if (ano.length === 2) ano = (Number(ano) > 70 ? "19" : "20") + ano;
+    return ano + "-" + String(m[2]).padStart(2, "0") + "-" + String(m[1]).padStart(2, "0");
+  }
+  m = s.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (m) return m[1] + "-" + m[2] + "-" + m[3];
+  return "";
+}
+
+/* ===========================================================
+   OFX / QFX
+   Arquivo em SGML: as etiquetas costumam vir SEM fechamento.
+   Por isso a leitura e por etiqueta + "tudo ate o fim da linha
+   ou ate a proxima etiqueta", que funciona nas duas formas.
+=========================================================== */
+function tagOFX(bloco, tag) {
+  const m = String(bloco || "").match(new RegExp("<" + tag + ">([^<\\r\\n]*)", "i"));
+  return m ? m[1].trim() : "";
+}
+function dataOFX(txt) {
+  const s = String(txt || "").replace(/[^0-9]/g, "");
+  if (s.length < 8) return "";
+  return s.slice(0, 4) + "-" + s.slice(4, 6) + "-" + s.slice(6, 8);
+}
+
+function lerOFX(texto) {
+  const t = String(texto || "");
+  const linhas = [];
+  const partes = t.split(/<STMTTRN>/i).slice(1);
+  partes.forEach((p) => {
+    const bloco = p.split(/<\/STMTTRN>/i)[0];
+    const valor = numeroSolto(tagOFX(bloco, "TRNAMT"));
+    const data = dataOFX(tagOFX(bloco, "DTPOSTED")) || dataOFX(tagOFX(bloco, "DTUSER"));
+    if (valor == null || !data) return;
+    const nome = tagOFX(bloco, "NAME");
+    const memo = tagOFX(bloco, "MEMO");
+    let desc = memo || nome;
+    if (nome && memo && normalizarTexto(nome) !== normalizarTexto(memo)) desc = nome + " — " + memo;
+    linhas.push({
+      ordem: linhas.length,
+      data: data,
+      valor: valor,
+      descricao: (desc || tagOFX(bloco, "TRNTYPE") || "").replace(/\s+/g, " ").trim(),
+      fitid: tagOFX(bloco, "FITID"),
+      saldo: null
+    });
+  });
+
+  let saldoFim = null, dataSaldo = "";
+  const bal = t.match(/<LEDGERBAL>([\s\S]*?)(?:<\/LEDGERBAL>|<AVAILBAL>|<\/STMTRS>|<\/CCSTMTRS>|$)/i);
+  if (bal) { saldoFim = numeroSolto(tagOFX(bal[1], "BALAMT")); dataSaldo = dataOFX(tagOFX(bal[1], "DTASOF")); }
+
+  return {
+    formato: "OFX",
+    linhas: linhas,
+    ini: dataOFX(tagOFX(t, "DTSTART")),
+    fim: dataOFX(tagOFX(t, "DTEND")),
+    saldoFim: saldoFim,
+    dataSaldo: dataSaldo,
+    banco: tagOFX(t, "BANKID"),
+    agencia: tagOFX(t, "BRANCHID"),
+    numeroConta: tagOFX(t, "ACCTID"),
+    ehCartao: /<CCSTMTRS>|<CCACCTFROM>/i.test(t)
+  };
+}
+
+/* ===========================================================
+   CSV / TXT
+=========================================================== */
+function dividirCSV(linha, sep) {
+  const out = [];
+  let atual = "", aspas = false;
+  const s = String(linha || "");
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (aspas) {
+      if (c === '"') { if (s[i + 1] === '"') { atual += '"'; i++; } else aspas = false; }
+      else atual += c;
+    } else if (c === '"') aspas = true;
+    else if (c === sep) { out.push(atual); atual = ""; }
+    else atual += c;
+  }
+  out.push(atual);
+  return out.map(x => x.replace(/\s+/g, " ").trim());
+}
+
+/* O separador e o que reparte as linhas em pedacos de forma
+   CONSTANTE. Contar so o mais frequente erra em historico que
+   tem virgula dentro. */
+function separadorCSV(linhas) {
+  const cands = [";", "\t", ",", "|"];
+  let melhor = ";", nota = -1e9;
+  cands.forEach(sep => {
+    const amostra = linhas.slice(0, 40);
+    const qtds = amostra.map(l => dividirCSV(l, sep).length);
+    const media = qtds.reduce((a, b) => a + b, 0) / (qtds.length || 1);
+    if (media < 2) return;
+    const desvio = qtds.reduce((a, b) => a + Math.abs(b - media), 0) / (qtds.length || 1);
+    const n = media - desvio * 3;
+    if (n > nota) { nota = n; melhor = sep; }
+  });
+  return melhor;
+}
+
+const RE_CAB = {
+  data:      /^(data|dt|date|data\b.*)$/i,
+  descricao: /(hist[oó]rico|descri|lan[cç]amento|detalhe|estabelecim|title|memo|observa|documento)/i,
+  valor:     /^(valor|vlr|montante|amount|quantia|valor\s*\(?r?\$?\)?)/i,
+  credito:   /^(cr[eé]dito|entrada|receita|cr)$/i,
+  debito:    /^(d[eé]bito|sa[ií]da|despesa|db)$/i,
+  saldo:     /^(saldo|balance)/i
+};
+
+function mapearCabecalho(linha) {
+  const m = { data: null, descricao: null, valor: null, credito: null, debito: null, saldo: null };
+  (linha || []).forEach((celula, i) => {
+    const c = String(celula || "").trim();
+    if (!c) return;
+    if (m.saldo === null && RE_CAB.saldo.test(c)) { m.saldo = i; return; }
+    if (m.data === null && RE_CAB.data.test(c)) { m.data = i; return; }
+    if (m.credito === null && RE_CAB.credito.test(c)) { m.credito = i; return; }
+    if (m.debito === null && RE_CAB.debito.test(c)) { m.debito = i; return; }
+    if (m.valor === null && RE_CAB.valor.test(c)) { m.valor = i; return; }
+    if (m.descricao === null && RE_CAB.descricao.test(c)) { m.descricao = i; return; }
+  });
+  return m;
+}
+
+/* Sem cabecalho reconhecivel, o conteudo entrega as colunas:
+   a que so tem data e a data, as que so tem numero sao valor e
+   saldo (o saldo e o ultimo), e a de texto mais longo e o
+   historico. */
+function inferirColunas(matriz) {
+  const largura = matriz.reduce((mx, r) => Math.max(mx, r.length), 0);
+  const conta = [];
+  for (let c = 0; c < largura; c++) conta.push({ datas: 0, numeros: 0, texto: 0, letras: 0 });
+  let usadas = 0;
+  for (let i = 0; i < matriz.length && usadas < 60; i++) {
+    const r = matriz[i];
+    if (!r || r.length < 2) continue;
+    usadas++;
+    for (let c = 0; c < largura; c++) {
+      const v = r[c] || "";
+      if (!v) continue;
+      if (dataSolta(v)) conta[c].datas++;
+      else if (numeroSolto(v) != null) conta[c].numeros++;
+      else { conta[c].texto++; conta[c].letras += v.length; }
+    }
+  }
+  const mapa = { data: null, descricao: null, valor: null, credito: null, debito: null, saldo: null };
+  let melhorData = -1, melhorTexto = -1;
+  const numericas = [];
+  for (let c = 0; c < largura; c++) {
+    if (conta[c].datas > 0 && (melhorData < 0 || conta[c].datas > conta[melhorData].datas)) melhorData = c;
+    if (conta[c].numeros >= Math.max(2, usadas * 0.5)) numericas.push(c);
+    if (conta[c].letras > 0 && (melhorTexto < 0 || conta[c].letras > conta[melhorTexto].letras)) melhorTexto = c;
+  }
+  mapa.data = melhorData >= 0 ? melhorData : null;
+  mapa.descricao = melhorTexto >= 0 ? melhorTexto : null;
+  if (numericas.length >= 2) { mapa.valor = numericas[numericas.length - 2]; mapa.saldo = numericas[numericas.length - 1]; }
+  else if (numericas.length === 1) { mapa.valor = numericas[0]; }
+  return mapa;
+}
+
+/* Linha de saldo nao e lancamento: entraria como despesa gigante
+   e estouraria a conta. */
+const RE_LINHA_SALDO = /^(saldo|s a l d o|total|subtotal|saldo do dia|saldo anterior|saldo final|saldo em conta|saldo disponivel)/i;
+
+function montarLinhasCSV(matriz, inicio, mapa) {
+  const out = [];
+  if (mapa.data == null) return out;
+  for (let i = inicio; i < matriz.length; i++) {
+    const r = matriz[i] || [];
+    const data = dataSolta(r[mapa.data]);
+    if (!data) continue;
+    const desc = (mapa.descricao != null ? String(r[mapa.descricao] || "") : "").trim();
+    if (RE_LINHA_SALDO.test(desc)) continue;
+
+    let valor = null;
+    if (mapa.valor != null) valor = numeroSolto(r[mapa.valor]);
+    if ((valor == null || valor === 0) && (mapa.credito != null || mapa.debito != null)) {
+      const c = mapa.credito != null ? numeroSolto(r[mapa.credito]) : null;
+      const d = mapa.debito != null ? numeroSolto(r[mapa.debito]) : null;
+      if (c) valor = Math.abs(c);
+      else if (d) valor = -Math.abs(d);
+    }
+    if (valor == null || valor === 0) continue;
+
+    out.push({
+      ordem: out.length,
+      data: data,
+      valor: valor,
+      descricao: desc.replace(/\s+/g, " ").trim(),
+      fitid: "",
+      saldo: mapa.saldo != null ? numeroSolto(r[mapa.saldo]) : null
+    });
+  }
+  return out;
+}
+
+function lerCSV(texto) {
+  const cruas = String(texto || "").split(/\r?\n/).filter(l => l.trim() !== "");
+  if (!cruas.length) return { formato: "CSV", linhas: [], erro: "O arquivo está vazio." };
+  const sep = separadorCSV(cruas);
+  const matriz = cruas.map(l => dividirCSV(l, sep));
+
+  let iCab = -1, mapa = null;
+  for (let i = 0; i < Math.min(matriz.length, 15); i++) {
+    const m = mapearCabecalho(matriz[i]);
+    const temValor = m.valor != null || m.credito != null || m.debito != null;
+    if (m.data != null && temValor) { iCab = i; mapa = m; break; }
+  }
+  let inicio = iCab + 1;
+  if (!mapa) { mapa = inferirColunas(matriz); inicio = 0; }
+
+  const linhas = montarLinhasCSV(matriz, inicio, mapa);
+  const saldos = linhas.map(l => l.saldo).filter(s => s != null);
+  return {
+    formato: "CSV",
+    linhas: linhas,
+    ini: "", fim: "",
+    saldoFim: saldos.length ? saldos[saldos.length - 1] : null,
+    dataSaldo: "",
+    sep: sep,
+    matriz: matriz,
+    inicioDados: inicio,
+    cabecalho: iCab >= 0 ? matriz[iCab] : null,
+    mapa: mapa
+  };
+}
+
+/* ===========================================================
+   PORTA DE ENTRADA — descobre o formato e completa o cabecalho
+   (periodo, soma, saldo inicial deduzido).
+=========================================================== */
+function completarExtrato(arq, nomeArquivo) {
+  const linhas = arq.linhas || [];
+  const datas = linhas.map(l => l.data).filter(Boolean).sort();
+  const soma = linhas.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+  const ini = arq.ini || (datas.length ? datas[0] : "");
+  const fim = arq.fim || (datas.length ? datas[datas.length - 1] : "");
+  let saldoIni = null, saldoIniDeduzido = false;
+  if (arq.saldoFim != null) {
+    // O extrato quase nunca declara o saldo de abertura; deduzir dele
+    // mesmo serve so para desenhar o periodo. A conferencia de verdade
+    // e contra o saldo que o APP calculou — essa sim acusa extrato parcial.
+    saldoIni = Math.round((arq.saldoFim - soma) * 100) / 100;
+    saldoIniDeduzido = true;
+  }
+  return Object.assign({}, arq, {
+    nome: nomeArquivo || "",
+    ini: ini, fim: fim,
+    somaLinhas: Math.round(soma * 100) / 100,
+    saldoIni: saldoIni,
+    saldoIniDeduzido: saldoIniDeduzido,
+    quantas: linhas.length
+  });
+}
+
+function lerExtrato(nomeArquivo, texto) {
+  const n = String(nomeArquivo || "").toLowerCase();
+  const pareceOFX = /\.(ofx|qfx|ofc)$/.test(n) || /OFXHEADER|<STMTTRN>|<OFX>/i.test(texto);
+  let arq = pareceOFX ? lerOFX(texto) : lerCSV(texto);
+  if (!(arq.linhas || []).length && pareceOFX) arq = lerCSV(texto);      // OFX que na verdade era CSV
+  if (!(arq.linhas || []).length && !pareceOFX) {
+    const tentativa = lerOFX(texto);
+    if ((tentativa.linhas || []).length) arq = tentativa;
+  }
+  return completarExtrato(arq, nomeArquivo);
+}
+
+/* ===========================================================
+   PALPITE DE CATEGORIA a partir do historico do banco.
+   O historico do extrato nao fala o nome da categoria — fala o
+   nome do estabelecimento. Esta tabela e so um PALPITE: a tela
+   mostra a categoria escolhida em cada linha e da para trocar.
+=========================================================== */
+const PALPITES_EXTRATO = [
+  [/posto|ipiranga|shell|petrobr|ale combust|texaco/, "combustivel"],
+  [/supermerc|atacad|assai|carrefour|angeloni|bistek|giassi|komprao|hipper|big\b|makro|sams club|hortifr|acougue|padaria/, "mercado"],
+  [/ifood|rappi|mc ?donald|burger|subway|pizza|restaurant|lanchonet|churrasc|cafeteria|starbucks|habib/, "restaurante"],
+  [/netflix|spotify|disney|hbo|max\b|prime video|deezer|globoplay|cinema|steam|playstation|xbox/, "lazer"],
+  [/uber|99app|99 ?pop|cabify|estacionament|pedagio|sem parar|conectcar|veloe|autopass|onibus|passagem urbana/, "transporte"],
+  [/drogaria|drogasil|droga raia|pacheco|panvel|farmac|unimed|hapvida|amil|bradesco saude|laborator|clinic|hospital|odonto/, "saude"],
+  [/vivo|claro|tim\b|oi fixo|oi movel|telefon|celular/, "telefone"],
+  [/net ?virtua|internet|banda larga|provedor|starlink|vero|unifique/, "internet"],
+  [/celesc|copel|cemig|light|enel|cpfl|equatorial|energia|casan|sanepar|sabesp|corsan|agua e esgoto|comgas|gas natural/, "contas"],
+  [/iptu|ipva|darf|das\b|simples nacional|inss|fgts|licenciament|detran|receita federal|prefeitura|tribut/, "imposto"],
+  [/academia|smart ?fit|bluefit|crossfit|pilates/, "academia"],
+  [/seguro|porto seguro|sulamerica|allianz|azul seguros|tokio marine/, "seguro"],
+  [/aluguel|imobiliar|condominio|condomin/, "casa"],
+  [/escola|colegio|faculdad|univers|curso|mensalidade|uniasselvi|estacio/, "educacao"],
+  [/petshop|pet shop|veterinar|racao/, "pets"],
+  [/prestacao|financiamento|consorcio|emprestimo|credito pessoal|cdc\b|leasing/, "financiamento"],
+  [/aplicacao|resgate|cdb\b|poupanca|tesouro|rendimento|renda fixa|fundo de invest/, "investimento"],
+  [/salario|remuneracao|folha de pagament|adiantamento salarial/, "salario"],
+  [/pro ?labore/, "prolabore"],
+  [/dizimo|oferta|igreja|doacao/, "doacao"]
+];
+
+function iconePelaDescricao(txt) {
+  const n = normalizarTexto(txt);
+  if (!n) return null;
+  for (const par of PALPITES_EXTRATO) if (par[0].test(n)) return par[1];
+  for (const par of PALPITES_ICONE) if (par[0].test(n)) return par[1];
+  return null;
+}
+
+function adivinharCategoria(descricao, tipo, categorias) {
+  const doTipo = (categorias || []).filter(c => (c.tipo || "despesa") === tipo && c.ativa !== false);
+  if (!doTipo.length) return "";
+  const id = iconePelaDescricao(descricao);
+  if (id) {
+    const achou = doTipo.filter(c => c.icone === id)[0];
+    if (achou) return achou.id;
+  }
+  const padrao = doTipo.filter(c => /^(outros|extras)$/.test(normalizarTexto(c.nome)))[0];
+  return padrao ? padrao.id : "";
+}
+
+/* Forma de pagamento pelo historico. Aqui NAO se usa o texto
+   normalizado: ele apaga justamente "pix", "ted" e "doc". */
+function formaPelaDescricao(txt) {
+  const n = String(txt || "").toLowerCase();
+  if (/\bpix\b|pix\s|transferencia pix/.test(n)) return "pix";
+  if (/\bted\b|\bdoc\b|transferenc|transf\b/.test(n)) return "transferencia";
+  if (/boleto|pagamento de titulo|pagto conta|conta de consumo|debito automatico/.test(n)) return "boleto";
+  return "debito";
+}
+
+/* Historico do banco vira nome de estabelecimento legivel: sai o
+   codigo da maquininha, a data grudada e o excesso de espaco. */
+function limparHistorico(txt) {
+  return String(txt || "")
+    .replace(/\s+/g, " ")
+    .replace(/\b\d{2}\/\d{2}(\/\d{2,4})?\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+/* ===========================================================
+   CONCILIACAO — a parte que impede o prejuizo.
+   Cada linha do arquivo e comparada com o que JA existe:
+   - identificador do banco igual (FITID) => ja lancado, certeza;
+   - regra de negocio forte (mesmo valor, data +-3 dias, mesmo
+     estabelecimento) => PARECIDO, e parecido nunca vem marcado;
+   - nada parecido => novo, marcado.
+   A mesma compra chega duas vezes na vida real: pela foto do
+   comprovante e pela linha do extrato. E esse o caso que a
+   conferencia por FITID sozinha nao pega.
+=========================================================== */
+function classificarLinhasExtrato(arq, conta, lancamentos, categorias) {
+  const todos = lancamentos || [];
+  const porFitid = {};
+  todos.forEach(l => {
+    if (l.origemRef && l.origemRef.fitid) porFitid[String(l.contaId || "") + "|" + l.origemRef.fitid] = l;
+  });
+  const vistos = {};
+  const catPorId = indexarPorId(categorias);
+
+  return (arq.linhas || []).map((li, idx) => {
+    const tipo = (Number(li.valor) || 0) >= 0 ? "receita" : "despesa";
+    const estabelecimento = limparHistorico(li.descricao);
+    const candidato = {
+      data: li.data,
+      valor: Math.abs(Number(li.valor) || 0),
+      tipo: tipo,
+      estabelecimento: estabelecimento,
+      descricao: li.descricao,
+      contaId: conta.id,
+      origem: "extrato",
+      origemRef: { fitid: li.fitid || "" }
+    };
+
+    let situacao = "novo", parecidos = [], forca = 0, motivo = "";
+    const chaveFitid = String(conta.id) + "|" + (li.fitid || "");
+    if (li.fitid && porFitid[chaveFitid]) {
+      situacao = "lancado"; forca = 3; parecidos = [porFitid[chaveFitid]];
+      motivo = "mesmo identificador do banco (FITID) de um lançamento que já está aqui";
+    } else {
+      const achados = procurarPossivelDuplicado(todos, candidato);
+      if (achados.length) {
+        forca = achados[0].forca;
+        parecidos = achados.slice(0, 3).map(a => a.lancamento);
+        if (forca >= 3) { situacao = "lancado"; motivo = "arquivo já importado antes"; }
+        else {
+          situacao = "parecido";
+          motivo = forca >= 2
+            ? "mesmo valor, mesmo dia e mesmo estabelecimento de um lançamento que já existe"
+            : "mesmo valor e data próxima de um lançamento que já existe";
+        }
+      }
+    }
+
+    // Repetido dentro do proprio arquivo (extrato remontado, dois
+    // pedacos colados). Nao decide nada sozinho: so nao vem marcado.
+    const chave = li.fitid ? "F:" + li.fitid
+                           : li.data + "|" + Math.abs(Number(li.valor) || 0).toFixed(2) + "|" + normalizarTexto(li.descricao);
+    if (vistos[chave] != null && situacao === "novo") {
+      situacao = "repetido";
+      motivo = "esta mesma linha já aparece acima, no próprio arquivo";
+    }
+    if (vistos[chave] == null) vistos[chave] = idx;
+
+    const categoria = adivinharCategoria(li.descricao, tipo, categorias);
+    const cat = catPorId[categoria];
+    const repetitiva = !!(cat && cat.repetitiva);
+
+    return {
+      chave: "li-" + idx,
+      linha: li,
+      tipo: tipo,
+      estabelecimento: estabelecimento,
+      categoria: categoria,
+      situacao: situacao,
+      forca: forca,
+      motivo: motivo,
+      parecidos: parecidos,
+      repetitiva: repetitiva,
+      // Só o que é claramente novo vem marcado. Parecido, repetido e
+      // já lançado ficam desmarcados de propósito — a decisão é dele.
+      marcado: situacao === "novo"
+    };
+  });
+}
+
+
+/* ===========================================================
+   IMPORTAR EXTRATO — a tela que recebe o arquivo do banco.
+   Tres travas, as mesmas do lancamento a mao:
+   1) so abre com os dados ja carregados do Dropbox;
+   2) segunda checagem de duplicidade NO ATO de importar,
+      contra o estado do momento, nao contra a lista da tela;
+   3) nada parecido entra marcado — quem decide e voce.
+=========================================================== */
+
+const EXT_EXTRATO = /\.(ofx|qfx|ofc|csv|txt)$/i;
+
+function EtiquetaSituacao({ situacao }) {
+  const mapa = {
+    novo:     { txt: "novo",       fundo: "var(--chip-frio)",   cor: "var(--ok-claro)" },
+    parecido: { txt: "parecido",   fundo: "var(--aviso-bg)",    cor: "var(--ouro-escuro)" },
+    lancado:  { txt: "já lançado", fundo: "var(--linha)",       cor: "var(--suave)" },
+    repetido: { txt: "repetido",   fundo: "var(--aviso-bg)",    cor: "var(--ouro-escuro)" }
+  };
+  const m = mapa[situacao] || mapa.novo;
+  return (
+    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded whitespace-nowrap"
+          style={{ background: m.fundo, color: m.cor, border: "1px solid var(--borda)" }}>
+      {m.txt}
+    </span>
+  );
+}
+
+function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) {
+  const [arq, setArq] = useState(null);
+  const [itens, setItens] = useState([]);
+  const [erro, setErro] = useState("");
+  const [ocupado, setOcupado] = useState("");
+  const [daNuvem, setDaNuvem] = useState(null);      // caminho no Dropbox, quando veio de la
+  const [listaDbx, setListaDbx] = useState(null);
+  const [resultado, setResultado] = useState(null);
+  const entradaRef = useRef(null);
+
+  const pastaConta = PASTA_ENTRADA_DBX + "/" + (conta.codigo || "");
+
+  const carregarLista = useCallback(async () => {
+    if (!dropboxEstaConectado()) return;
+    setOcupado("Procurando arquivos no Dropbox...");
+    try {
+      const daPasta = await dropboxListarPasta(pastaConta);
+      const geral = await dropboxListarPasta(PASTA_ENTRADA_DBX);
+      const tudo = daPasta.map(a => Object.assign({}, a, { de: conta.codigo }))
+        .concat(geral.map(a => Object.assign({}, a, { de: "ENTRADA" })))
+        .filter(a => EXT_EXTRATO.test(a.nome));
+      setListaDbx(tudo);
+    } catch (e) { setErro(traduzirErro(e)); }
+    setOcupado("");
+  }, [pastaConta, conta.codigo]);
+
+  useEffect(() => { carregarLista(); }, [carregarLista]);
+
+  const processar = (nome, buffer, caminhoDbx) => {
+    setErro("");
+    try {
+      const texto = decodificarArquivo(buffer);
+      const lido = lerExtrato(nome, texto);
+      if (!lido.linhas.length) {
+        setErro("Não achei nenhum lançamento neste arquivo. Se for um extrato em PDF, ele ainda não entra por aqui — peça o OFX ao banco, que é o formato com o identificador de cada lançamento.");
+        return;
+      }
+      setArq(lido);
+      setDaNuvem(caminhoDbx || null);
+      setItens(classificarLinhasExtrato(lido, conta, dados.lancamentos, dados.categorias));
+    } catch (e) {
+      setErro("Não consegui ler o arquivo: " + String((e && e.message) || e));
+    }
+  };
+
+  const escolherArquivo = (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    setOcupado("Lendo o arquivo...");
+    const leitor = new FileReader();
+    leitor.onload = () => { setOcupado(""); processar(f.name, leitor.result, null); };
+    leitor.onerror = () => { setOcupado(""); setErro("Não consegui abrir o arquivo."); };
+    leitor.readAsArrayBuffer(f);
+  };
+
+  const pegarDoDropbox = async (item) => {
+    setOcupado("Baixando " + item.nome + "...");
+    try {
+      const buffer = await dropboxBaixarBytes(item.caminho);
+      setOcupado("");
+      processar(item.nome, buffer, item.caminho);
+    } catch (e) { setOcupado(""); setErro(traduzirErro(e)); }
+  };
+
+  const marcar = (chave, valor) => {
+    setItens(lista => lista.map(i => i.chave === chave ? Object.assign({}, i, { marcado: valor }) : i));
+  };
+  const trocarCategoria = (chave, catId) => {
+    setItens(lista => lista.map(i => i.chave === chave ? Object.assign({}, i, { categoria: catId }) : i));
+  };
+
+  const contagem = itens.reduce((a, i) => {
+    a[i.situacao] = (a[i.situacao] || 0) + 1;
+    if (i.marcado) a.marcados++;
+    return a;
+  }, { marcados: 0 });
+
+  const somaMarcados = itens.filter(i => i.marcado)
+    .reduce((s, i) => s + (i.tipo === "receita" ? 1 : -1) * Math.abs(Number(i.linha.valor) || 0), 0);
+  const saldoAntes = arq ? saldoDaConta(conta, dados.lancamentos, arq.fim) : 0;
+  const saldoProjetado = Math.round((saldoAntes + somaMarcados) * 100) / 100;
+  const difSaldo = (arq && arq.saldoFim != null) ? Math.round((saldoProjetado - arq.saldoFim) * 100) / 100 : null;
+
+  const importar = () => {
+    const escolhidos = itens.filter(i => i.marcado);
+    if (!escolhidos.length) return;
+    const agora = new Date().toISOString();
+    const relato = { entraram: 0, pulados: 0 };
+
+    alterar(d => {
+      // SEGUNDA CHECAGEM, no instante da gravacao: contra a lista que
+      // esta valendo agora — nao contra a copia que a tela montou.
+      const atuais = (d.lancamentos || []).slice();
+      const novos = [];
+      escolhidos.forEach(it => {
+        const l = {
+          id: uid(),
+          tipo: it.tipo,
+          data: it.linha.data,
+          valor: Math.abs(Number(it.linha.valor) || 0),
+          categoria: it.categoria || "",
+          estabelecimento: it.estabelecimento,
+          descricao: String(it.linha.descricao || "").slice(0, 200),
+          forma: formaPelaDescricao(it.linha.descricao),
+          contaId: conta.id,
+          cartaoId: "",
+          origem: "extrato",
+          origemRef: { fitid: it.linha.fitid || "", arquivo: arq.nome || "", importadoEm: agora },
+          criadoEm: agora,
+          atualizadoEm: agora
+        };
+        const achados = procurarPossivelDuplicado(atuais.concat(novos), l);
+        if (achados.length && achados[0].forca >= 3) { relato.pulados++; return; }
+        novos.push(l);
+      });
+      relato.entraram = novos.length;
+
+      const cobertura = {
+        id: uid(),
+        contaId: conta.id,
+        ini: arq.ini, fim: arq.fim,
+        saldoIni: arq.saldoIni, saldoFim: arq.saldoFim,
+        saldoIniDeduzido: !!arq.saldoIniDeduzido,
+        somaLinhas: arq.somaLinhas,
+        linhasNoArquivo: arq.quantas,
+        linhasImportadas: novos.length,
+        arquivo: arq.nome,
+        formato: arq.formato,
+        importadoEm: agora
+      };
+
+      return Object.assign({}, d, {
+        lancamentos: atuais.concat(novos),
+        coberturas: (d.coberturas || []).concat([cobertura])
+      });
+    });
+
+    setTimeout(() => setResultado(Object.assign({}, relato)), 0);
+  };
+
+  const arquivarNoDropbox = async () => {
+    if (!daNuvem) return;
+    setOcupado("Guardando o arquivo em /LANCADOS...");
+    const destino = await dropboxArquivar(daNuvem);
+    setOcupado("");
+    setDaNuvem(null);
+    setResultado(r => Object.assign({}, r || {}, { arquivado: destino ? true : false }));
+  };
+
+  /* ---------- fim: o que entrou ---------- */
+  if (resultado) {
+    return (
+      <Modal titulo="Extrato importado" onClose={onClose}>
+        <div className="space-y-3">
+          <Cartao className="p-3">
+            <div className="text-sm">
+              Entraram <b>{resultado.entraram}</b> {resultado.entraram === 1 ? "lançamento" : "lançamentos"} em {conta.nome}.
+            </div>
+            {resultado.pulados ? (
+              <div className="text-[13px] mt-1" style={{ color: "var(--suave)" }}>
+                {resultado.pulados} {resultado.pulados === 1 ? "linha foi descartada" : "linhas foram descartadas"} na
+                conferência final por já estarem lançadas.
+              </div>
+            ) : null}
+          </Cartao>
+          {difSaldo != null && Math.abs(difSaldo) >= 0.005 ? (
+            <Faixa tom="erro">
+              O saldo calculado ({currency(saldoProjetado)}) não bate com o saldo que o banco declara em {dataCurta(arq.fim)} ({currency(arq.saldoFim)}).
+              Faltam {currency(Math.abs(difSaldo))} — sinal de <b>extrato parcial</b> ou de saldo inicial da conta errado no cadastro.
+            </Faixa>
+          ) : null}
+          {daNuvem ? (
+            <Cartao className="p-3 flex items-center gap-2 flex-wrap">
+              <span className="text-[13px] flex-1">Tirar o arquivo da caixa de entrada e guardar em /LANCADOS?</span>
+              <Botao tom="neutro" onClick={arquivarNoDropbox} disabled={!!ocupado}>Guardar</Botao>
+            </Cartao>
+          ) : null}
+          {resultado.arquivado ? (
+            <div className="text-[13px]" style={{ color: "var(--suave)" }}>Arquivo movido para /LANCADOS.</div>
+          ) : null}
+          <div className="flex justify-end"><Botao onClick={onClose}>Fechar</Botao></div>
+        </div>
+      </Modal>
+    );
+  }
+
+  /* ---------- escolha do arquivo ---------- */
+  if (!arq) {
+    return (
+      <Modal titulo={"Importar extrato — " + conta.nome} onClose={onClose} largura={620}>
+        <div className="space-y-3">
+          {!dadosProntos ? (
+            <Faixa tom="erro">
+              Os lançamentos ainda estão carregando do Dropbox. A importação fica travada até chegarem —
+              é o que impede conferir duplicidade contra uma lista vazia.
+            </Faixa>
+          ) : null}
+          {erro ? <Faixa tom="erro">{erro}</Faixa> : null}
+          {ocupado ? <Faixa tom="aviso"><span className="inline-flex items-center gap-2"><IconLoader size={14} /> {ocupado}</span></Faixa> : null}
+
+          <Cartao className="p-3">
+            <div className="text-[11px] uppercase tracking-wide mb-2" style={{ color: "var(--suave)" }}>Do aparelho</div>
+            <input ref={entradaRef} type="file" accept=".ofx,.qfx,.ofc,.csv,.txt" onChange={escolherArquivo}
+                   disabled={!dadosProntos} style={{ display: "none" }} />
+            <Botao onClick={() => entradaRef.current && entradaRef.current.click()} disabled={!dadosProntos}>
+              <IconUpload size={15} /> Escolher arquivo
+            </Botao>
+            <div className="text-[12px] mt-2" style={{ color: "var(--suave)" }}>
+              OFX é o melhor: cada lançamento vem com o identificador do banco, e o mesmo arquivo importado
+              duas vezes não duplica nada. CSV também entra. PDF ainda não.
+            </div>
+          </Cartao>
+
+          <Cartao className="p-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[11px] uppercase tracking-wide" style={{ color: "var(--suave)" }}>Da caixa de entrada do Dropbox</span>
+              <button onClick={carregarLista} className="text-[12px] underline" style={{ color: "var(--suave)" }}>atualizar</button>
+            </div>
+            {!dropboxEstaConectado() ? (
+              <div className="text-[13px]" style={{ color: "var(--suave)" }}>Dropbox não conectado.</div>
+            ) : listaDbx === null ? (
+              <div className="text-[13px]" style={{ color: "var(--suave)" }}>Procurando...</div>
+            ) : !listaDbx.length ? (
+              <div className="text-[13px]" style={{ color: "var(--suave)" }}>
+                Nada em <b>ENTRADA/{conta.codigo}</b> nem em <b>ENTRADA</b>. Jogue o arquivo do banco lá pelo celular e clique em atualizar.
+              </div>
+            ) : (
+              <div>
+                {listaDbx.map(a => (
+                  <div key={a.caminho} className="flex items-center gap-2 py-1.5" style={{ borderTop: "1px solid var(--linha)" }}>
+                    <IconFolder size={14} style={{ color: "var(--suave)" }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] truncate">{a.nome}</div>
+                      <div className="text-[11px]" style={{ color: "var(--suave)" }}>{a.de} · {dataCurta(String(a.em).slice(0, 10))}</div>
+                    </div>
+                    <Botao tom="neutro" onClick={() => pegarDoDropbox(a)} disabled={!dadosProntos || !!ocupado}>Ler</Botao>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Cartao>
+        </div>
+      </Modal>
+    );
+  }
+
+  /* ---------- conferencia ---------- */
+  const cats = (dados.categorias || []).filter(c => c.ativa !== false);
+  return (
+    <Modal titulo={"Conferir — " + (arq.nome || "extrato")} onClose={onClose} largura={860}>
+      <div className="space-y-3">
+        {erro ? <Faixa tom="erro">{erro}</Faixa> : null}
+
+        <div className="grade-totais">
+          <StatCard label="Linhas no arquivo" valor={String(arq.quantas)} icone={IconList}
+                    rodape={arq.formato + (arq.ini ? " · " + dataCurta(arq.ini) + " a " + dataCurta(arq.fim) : "")} />
+          <StatCard label="Novos" valor={String(contagem.novo || 0)} icone={IconPlus} tom="ok" />
+          <StatCard label="Parecidos" valor={String((contagem.parecido || 0) + (contagem.repetido || 0))} icone={IconAlert}
+                    tom={(contagem.parecido || contagem.repetido) ? "perigo" : "neutro"} rodape="não vêm marcados" />
+          <StatCard label="Já lançados" valor={String(contagem.lancado || 0)} icone={IconCheck} />
+        </div>
+
+        {arq.saldoFim != null ? (
+          <Cartao className="p-3 text-[13px]">
+            <div className="flex justify-between gap-2 flex-wrap">
+              <span style={{ color: "var(--suave)" }}>Saldo que o banco declara em {dataCurta(arq.dataSaldo || arq.fim)}</span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(arq.saldoFim)}</span>
+            </div>
+            <div className="flex justify-between gap-2 flex-wrap mt-1">
+              <span style={{ color: "var(--suave)" }}>Saldo do app depois de importar o que está marcado</span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(saldoProjetado)}</span>
+            </div>
+            {difSaldo != null && Math.abs(difSaldo) >= 0.005 ? (
+              <div className="mt-2">
+                <Faixa tom="erro">
+                  Diferença de {currency(Math.abs(difSaldo))}. Ou o extrato é parcial (falta pedaço), ou o saldo
+                  inicial desta conta no cadastro está diferente do real. Dá para importar assim mesmo — o app
+                  registra o furo e avisa na tela da conta.
+                </Faixa>
+              </div>
+            ) : (
+              <div className="mt-1 text-[12px]" style={{ color: "var(--ok-claro)" }}>Confere com o saldo do banco.</div>
+            )}
+          </Cartao>
+        ) : (
+          <Faixa tom="aviso">Este arquivo não declara o saldo final, então não dá para conferir se veio completo.</Faixa>
+        )}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Botao tom="neutro" onClick={() => setItens(l => l.map(i => Object.assign({}, i, { marcado: i.situacao === "novo" })))}>
+            Só os novos
+          </Botao>
+          <Botao tom="neutro" onClick={() => setItens(l => l.map(i => Object.assign({}, i, { marcado: false })))}>
+            Desmarcar tudo
+          </Botao>
+          <span className="text-[12px]" style={{ color: "var(--suave)" }}>
+            {contagem.marcados} marcado{contagem.marcados === 1 ? "" : "s"} · movimenta {currency(Math.abs(somaMarcados))}
+          </span>
+        </div>
+
+        <Cartao className="overflow-hidden">
+          <div className="rolagem-resp" style={{ overflowX: "auto", maxHeight: "48vh", overflowY: "auto" }}>
+            <table className="tab-resp w-full text-[13px]">
+              <thead>
+                <tr style={{ background: "var(--barra)", color: "var(--na-barra-suave)" }}>
+                  <th className="text-left font-semibold px-2 py-2"> </th>
+                  <th className="text-left font-semibold px-2 py-2">Data</th>
+                  <th className="text-left font-semibold px-2 py-2">Histórico</th>
+                  <th className="text-left font-semibold px-2 py-2">Categoria</th>
+                  <th className="text-right font-semibold px-2 py-2">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itens.map(i => {
+                  const receita = i.tipo === "receita";
+                  const apagado = i.situacao === "lancado";
+                  return (
+                    <tr key={i.chave} style={{ borderTop: "1px solid var(--linha)", opacity: apagado ? 0.55 : 1 }}>
+                      <td className="px-2 py-2" data-rot="Importar">
+                        <input type="checkbox" checked={i.marcado} onChange={(e) => marcar(i.chave, e.target.checked)}
+                               style={{ width: 18, height: 18, accentColor: "var(--acento)" }} />
+                      </td>
+                      <td className="px-2 py-2" data-rot="Data" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{dataCurta(i.linha.data)}</td>
+                      <td className="px-2 py-2 celula-larga" data-rot="Histórico">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold">{i.estabelecimento || "(sem histórico)"}</span>
+                          <EtiquetaSituacao situacao={i.situacao} />
+                        </div>
+                        {i.motivo ? <div className="text-[11px]" style={{ color: "var(--suave)" }}>{i.motivo}</div> : null}
+                        {i.parecidos && i.parecidos.length ? (
+                          <div className="text-[11px]" style={{ color: "var(--suave)" }}>
+                            já existe:{" "}
+                            {i.parecidos.map((pp, k) => (
+                              <span key={pp.id || k} style={{ whiteSpace: "nowrap" }}>
+                                {k ? " · " : ""}{dataCurta(pp.data)} {currency(pp.valor)}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td className="px-2 py-2 celula-larga" data-rot="Categoria">
+                        <select value={i.categoria || ""} onChange={(e) => trocarCategoria(i.chave, e.target.value)}
+                                className="rounded-md px-2 py-1 text-[12px] outline-none w-full"
+                                style={inputStyle}>
+                          <option value="">Sem categoria</option>
+                          {cats.filter(c => (c.tipo || "despesa") === i.tipo).map(c => (
+                            <option key={c.id} value={c.id}>{c.nome}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2 text-right" data-rot="Valor"
+                          style={{ fontFamily: "'JetBrains Mono', monospace", color: receita ? "var(--ok-claro)" : "var(--texto)" }}>
+                        {receita ? "+" : "−"} {currency(Math.abs(i.linha.valor))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Cartao>
+
+        <div className="flex justify-end gap-2">
+          <Botao tom="neutro" onClick={() => { setArq(null); setItens([]); setDaNuvem(null); }}>Trocar arquivo</Botao>
+          <Botao onClick={importar} disabled={!dadosProntos || !contagem.marcados}>
+            <IconCheck size={15} /> Importar {contagem.marcados || ""}
+          </Botao>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+
+/* ===========================================================
    SELETOR DE MES
 =========================================================== */
 function SeletorMes({ mes, onMes }) {
@@ -1835,11 +2767,12 @@ function FiltroTitular({ valor, onValor }) {
   );
 }
 
-function AbaBancos({ dados, alterar, mes }) {
+function AbaBancos({ dados, alterar, mes, dadosProntos }) {
   const [filtro, setFiltro] = useState("TUDO");
   const [aberta, setAberta] = useState(null);   // conta com extrato aberto
   const [cartaoAberto, setCartaoAberto] = useState(null); // cartao com fatura aberta
   const [novaApl, setNovaApl] = useState(null); // aplicacao sendo atualizada
+  const [importarNa, setImportarNa] = useState(null); // conta recebendo extrato
 
   const mapaContas = indexarPorId(dados.contas);
   const mapaCartoes = indexarPorId(dados.cartoes);
@@ -1878,7 +2811,8 @@ function AbaBancos({ dados, alterar, mes }) {
   }, [contas, cartoes, aplicacoes, contratos, dados.lancamentos]);
 
   if (aberta) {
-    return <ExtratoDaConta conta={aberta} dados={dados} onVoltar={() => setAberta(null)} />;
+    return <ExtratoDaConta conta={aberta} dados={dados} alterar={alterar} dadosProntos={dadosProntos}
+                           onVoltar={() => setAberta(null)} />;
   }
   if (cartaoAberto) {
     return <FaturaCartao cartao={cartaoAberto} dados={dados} mes={mes} onVoltar={() => setCartaoAberto(null)} />;
@@ -1982,6 +2916,9 @@ function AbaBancos({ dados, alterar, mes }) {
                   </span>
                   <button className="text-[11px] underline no-print" style={{ color: "var(--acento-vivo)" }}
                           onClick={() => setAberta(c)}>ver extrato</button>
+                  {/* atalho direto: um clique da lista para a leitura do arquivo */}
+                  <button className="text-[11px] underline no-print" style={{ color: "var(--acento-vivo)" }}
+                          onClick={() => setImportarNa(c)}>importar extrato</button>
                 </div>
                 {furos.length ? (
                   <div className="mt-1.5">
@@ -2069,6 +3006,11 @@ function AbaBancos({ dados, alterar, mes }) {
             setNovaApl(null);
           }} />
       ) : null}
+
+      {importarNa ? (
+        <ModalImportarExtrato conta={importarNa} dados={dados} alterar={alterar} dadosProntos={dadosProntos}
+                              onClose={() => setImportarNa(null)} />
+      ) : null}
     </div>
   );
 }
@@ -2111,12 +3053,24 @@ function ModalAtualizarAplicacao({ aplicacao, onSalvar, onClose }) {
 /* ===========================================================
    EXTRATO DE UMA CONTA — com o saldo em cada linha
 =========================================================== */
-function ExtratoDaConta({ conta, dados, onVoltar }) {
+function ExtratoDaConta({ conta, dados, alterar, dadosProntos, onVoltar }) {
   const catPorId = indexarPorId(dados.categorias);
   const linhas = extratoDaConta(conta, dados.lancamentos).slice().reverse();
   const furos = furosDaConta(conta.id, dados.coberturas);
   const cobs = (dados.coberturas || []).filter(c => c.contaId === conta.id)
     .sort((a, b) => String(b.ini).localeCompare(String(a.ini)));
+  const [importando, setImportando] = useState(false);
+
+  /* A conferencia que descobre extrato parcial de verdade: o saldo que
+     o APP calcula na data de fechamento do extrato contra o saldo que o
+     BANCO declarou naquele dia. Se nao bate, faltou linha. */
+  const ultima = cobs[0];
+  const conferenciaSaldo = (() => {
+    if (!ultima || ultima.saldoFim == null) return null;
+    const calculado = saldoDaConta(conta, dados.lancamentos, ultima.fim);
+    const dif = Math.round((calculado - Number(ultima.saldoFim)) * 100) / 100;
+    return { calculado: calculado, declarado: Number(ultima.saldoFim), dif: dif, em: ultima.fim };
+  })();
 
   return (
     <div className="space-y-4">
@@ -2125,10 +3079,27 @@ function ExtratoDaConta({ conta, dados, onVoltar }) {
         <h2 className="text-base font-bold">{conta.nome}</h2>
         <ChipTitular valor={conta.titularidade} />
         <span className="text-[12px]" style={{ color: "var(--suave)" }}>{conta.banco} · {conta.codigo}</span>
+        <Botao tom="neutro" className="no-print" onClick={() => setImportando(true)} disabled={!dadosProntos}
+               titulo={dadosProntos ? "Ler um extrato OFX ou CSV" : "Carregando lançamentos..."}>
+          <IconUpload size={15} /> Importar extrato
+        </Botao>
         <span className="ml-auto text-lg font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
           {currency(saldoDaConta(conta, dados.lancamentos))}
         </span>
       </div>
+
+      {importando ? (
+        <ModalImportarExtrato conta={conta} dados={dados} alterar={alterar} dadosProntos={dadosProntos}
+                              onClose={() => setImportando(false)} />
+      ) : null}
+
+      {conferenciaSaldo && Math.abs(conferenciaSaldo.dif) >= 0.005 ? (
+        <Faixa tom="erro">
+          Em {dataCurta(conferenciaSaldo.em)} o banco declarou {currency(conferenciaSaldo.declarado)} e o app
+          calcula {currency(conferenciaSaldo.calculado)} — {currency(Math.abs(conferenciaSaldo.dif))} de diferença.
+          Ou falta pedaço de extrato, ou o saldo inicial desta conta no cadastro está diferente do real.
+        </Faixa>
+      ) : null}
 
       {(() => {
         const u = usoDoLimite(conta, dados.lancamentos);
@@ -2202,7 +3173,7 @@ function ExtratoDaConta({ conta, dados, onVoltar }) {
                   return (
                     <tr key={l.id} style={{ borderTop: "1px solid var(--linha)" }}>
                       <td className="px-3 py-2" data-rot="Data" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{dataCurta(l.data)}</td>
-                      <td className="px-3 py-2" data-rot="Histórico">
+                      <td className="px-3 py-2 celula-larga" data-rot="Histórico">
                         <div className="font-semibold">{l.estabelecimento || l.descricao || "(sem nome)"}</div>
                         <div className="text-[11px]" style={{ color: "var(--suave)" }}>
                           {l.origem === "extrato" ? "veio do extrato" : l.origem === "fatura" ? "veio da fatura" : l.origem === "foto" ? "veio da foto" : "digitado"}
@@ -3609,7 +4580,7 @@ function App() {
         ) : null}
 
         {aba === "resumo" ? <AbaResumo dados={dados} mes={mes} onMes={setMes} /> : null}
-        {aba === "bancos" ? <AbaBancos dados={dados} alterar={alterar} mes={mes} /> : null}
+        {aba === "bancos" ? <AbaBancos dados={dados} alterar={alterar} mes={mes} dadosProntos={dadosProntos} /> : null}
         {aba === "contratos" ? <AbaContratos dados={dados} alterar={alterar} /> : null}
         {aba === "graficos" ? <AbaGraficos dados={dados} mes={mes} onMes={setMes} /> : null}
         {aba === "lancamentos" ? (
