@@ -172,7 +172,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
    Painel de Bordo: carregador + app.html, auto-atualizacao,
    Dropbox por PKCE e leitura de documento por IA.
 =========================================================== */
-const APP_VERSION = "v9";
+const APP_VERSION = "v11";
 const NOME_APP = "Prumo";
 
 /* ===========================================================
@@ -448,8 +448,16 @@ const LS_DROPBOX = {
 };
 
 const NOME_ARQUIVO_DROPBOX = "/prumo-dados.json";
-const PASTA_ENTRADA_DBX  = "/ENTRADA";
-const PASTA_LANCADOS_DBX = "/LANCADOS";
+/* O nome da pasta carrega o nome do app DE PROPOSITO. O Painel de
+   Bordo tem uma /ENTRADA e uma /LANCADOS dele, e no celular as duas
+   apareciam com o mesmo nome — era so uma questao de tempo ate um
+   extrato do banco cair na caixa dos fretes. Aqui tudo comeca com
+   PRUMO: no meio de qualquer lista, da para ver de longe. */
+const PASTA_ENTRADA_DBX  = "/PRUMO-ENTRADA";
+const PASTA_LANCADOS_DBX = "/PRUMO-LANCADOS";
+/* Nomes antigos: continuam sendo lidos para nenhum arquivo ja
+   enviado ficar orfao se a pasta ainda nao tiver sido renomeada. */
+const PASTAS_ENTRADA_ANTIGAS = ["/ENTRADA"];
 
 /* App Key do app "Prumo" no Dropbox. E publica por natureza: no fluxo
    PKCE nao existe client secret no navegador, entao deixar fixa aqui
@@ -1214,8 +1222,13 @@ function resumoContrato(contrato) {
   const proxima = abertas.slice().sort((a, b) => String(a.vencimento).localeCompare(String(b.vencimento)))[0] || null;
   const totalPago = pagas.reduce((s, x) => s + (Number(x.valorPago) || Number(x.valor) || 0), 0);
   const totalContrato = ps.reduce((s, x) => s + (Number(x.valor) || 0), 0);
-  const saldoDevedor = proxima ? (Number(proxima.saldoDevedor) || 0) + (Number(proxima.amortizacao) || 0)
-                               : (ps.length ? 0 : Number(contrato.valorFinanciado) || 0);
+  /* Quando o contrato veio do demonstrativo do banco, o saldo devedor
+     e o que o BANCO declarou — nao um calculo meu por cima da tabela
+     dele. Numa renegociacao os dois nao batem, e quem manda e o banco. */
+  const saldoDevedor = contrato.saldoDevedorDeclarado != null
+    ? Number(contrato.saldoDevedorDeclarado)
+    : (proxima ? (Number(proxima.saldoDevedor) || 0) + (Number(proxima.amortizacao) || 0)
+               : (ps.length ? 0 : Number(contrato.valorFinanciado) || 0));
   const taxaMes = Number(contrato.taxaMes) || 0;
   return {
     total: ps.length,
@@ -1771,6 +1784,32 @@ function completarExtrato(arq, nomeArquivo) {
   });
 }
 
+/* CONFERENCIA DIA A DIA — a prova de que o arquivo foi lido inteiro.
+   O extrato em PDF do banco imprime o SALDO DO DIA depois de cada dia
+   com movimento. Se o saldo de um dia mais os lancamentos do dia
+   seguinte derem exatamente o saldo declarado do dia seguinte, entao
+   nenhuma linha se perdeu na leitura — e nenhuma sobrou.
+   Vale mais que conferir so o saldo final: aponta ONDE furou. */
+function conferirDiaADia(arq) {
+  const dentro = (arq.saldosDoDia || [])
+    .filter(s => (!arq.ini || s.data >= arq.ini) && (!arq.fim || s.data <= arq.fim))
+    .slice().sort((a, b) => String(a.data).localeCompare(String(b.data)));
+  if (dentro.length < 2) return null;
+  const porDia = {};
+  (arq.linhas || []).forEach(l => { porDia[l.data] = (porDia[l.data] || 0) + (Number(l.valor) || 0); });
+  const falhas = [];
+  for (let i = 1; i < dentro.length; i++) {
+    const esperado = Math.round((dentro[i - 1].saldo + (porDia[dentro[i].data] || 0)) * 100) / 100;
+    if (Math.abs(esperado - dentro[i].saldo) > 0.005) {
+      falhas.push({
+        data: dentro[i].data, esperado: esperado, declarado: dentro[i].saldo,
+        diferenca: Math.round((dentro[i].saldo - esperado) * 100) / 100
+      });
+    }
+  }
+  return { dias: dentro.length - 1, conferem: dentro.length - 1 - falhas.length, falhas: falhas };
+}
+
 function lerExtrato(nomeArquivo, texto) {
   const n = String(nomeArquivo || "").toLowerCase();
   const pareceOFX = /\.(ofx|qfx|ofc)$/.test(n) || /OFXHEADER|<STMTTRN>|<OFX>/i.test(texto);
@@ -1941,6 +1980,271 @@ function classificarLinhasExtrato(arq, conta, lancamentos, categorias) {
 
 
 /* ===========================================================
+   PDF — leitura do texto COM AS COORDENADAS.
+   Extrato e tabela de parcelas sao tabelas. Ler PDF como texto
+   corrido junta a nota de rodape no meio da linha e o valor sai
+   errado (aconteceu de verdade: a parcela 25 do demonstrativo do
+   Itau tem uma nota atravessada por cima). Com a posicao de cada
+   pedaco, a nota vira um item solto e e descartada pelo tamanho.
+
+   Estes PDFs sao de TEXTO (impressos do site do banco), entao a
+   leitura e exata e nao custa nada: nao passa pela API. A IA
+   fica para o que e imagem de verdade.
+=========================================================== */
+const PDFJS_VERSAO = "3.11.174";
+const PDFJS_BASE = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/" + PDFJS_VERSAO + "/";
+let _pdfjsCarregando = null;
+
+/* Carregado so na primeira vez que um PDF aparece: nao pesa a
+   abertura do app no celular. */
+function carregarPdfJs() {
+  if (typeof window !== "undefined" && window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (_pdfjsCarregando) return _pdfjsCarregando;
+  _pdfjsCarregando = new Promise(function (ok, falha) {
+    const s = document.createElement("script");
+    s.src = PDFJS_BASE + "pdf.min.js";
+    s.onload = function () {
+      try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + "pdf.worker.min.js"; } catch (e) {}
+      ok(window.pdfjsLib);
+    };
+    s.onerror = function () { _pdfjsCarregando = null; falha(new Error("PDFJS_NAO_CARREGOU")); };
+    document.head.appendChild(s);
+  });
+  return _pdfjsCarregando;
+}
+
+/* Devolve as linhas da pagina, cada uma com os pedacos e o x de
+   cada um. Duas coisas na mesma altura sao a mesma linha. */
+async function pdfParaLinhas(buffer, lib) {
+  const pdfjs = lib || (await carregarPdfJs());
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer), useSystemFonts: true }).promise;
+  const linhas = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const pagina = await doc.getPage(p);
+    const conteudo = await pagina.getTextContent();
+    const itens = conteudo.items
+      .filter(i => String(i.str).trim() !== "")
+      .map(i => ({ x: Math.round(i.transform[4] * 10) / 10, y: Math.round(i.transform[5] * 10) / 10, texto: String(i.str).trim() }));
+    itens.sort((a, b) => b.y - a.y || a.x - b.x);
+    const daPagina = [];
+    itens.forEach(it => {
+      const achou = daPagina.filter(l => Math.abs(l.y - it.y) <= 2.5)[0];
+      if (achou) achou.itens.push(it);
+      else daPagina.push({ pagina: p, y: it.y, itens: [it] });
+    });
+    daPagina.forEach(l => {
+      l.itens.sort((a, b) => a.x - b.x);
+      l.texto = l.itens.map(i => i.texto).join(" ").replace(/\s+/g, " ").trim();
+    });
+    linhas.push.apply(linhas, daPagina);
+  }
+  try { doc.destroy(); } catch (e) {}
+  return linhas;
+}
+
+function acharLinha(linhas, re) {
+  for (const l of linhas) { const m = l.texto.match(re); if (m) return m; }
+  return null;
+}
+function pegar(linhas, re, indice) {
+  const m = acharLinha(linhas, re);
+  return m ? String(m[indice || 1]).trim() : "";
+}
+
+/* Que documento e este? Cinco coisas diferentes caem na mesma
+   pasta; tentar extrair valor antes de saber o que e o arquivo e
+   o caminho mais curto para lancar besteira. */
+function classificarPdf(linhas) {
+  const tudo = linhas.slice(0, 60).map(l => l.texto).join(" \n ");
+  if (/Demonstrativo de Evolu[çc][ãa]o da D[íi]vida/i.test(tudo)) return "divida";
+  if (/extrato conta|extrato\s*\/\s*lan[çc]amentos|per[íi]odo de visualiza[çc][ãa]o/i.test(tudo)) return "extrato";
+  if (/fatura|vencimento da fatura|limite total do cart[ãa]o/i.test(tudo)) return "fatura";
+  if (/Condi[çc][õo]es Gerais|Cl[áa]usula|CONTRATANTE/i.test(tudo)) return "condicoes";
+  return "desconhecido";
+}
+
+const NOME_TIPO_PDF = {
+  divida: "demonstrativo de evolução da dívida (contrato)",
+  extrato: "extrato de conta",
+  fatura: "fatura de cartão",
+  condicoes: "condições gerais / texto de contrato",
+  desconhecido: "documento não reconhecido"
+};
+
+/* ===========================================================
+   DEMONSTRATIVO DE EVOLUCAO DA DIVIDA
+   E o documento que interessa de um financiamento: traz a tabela
+   inteira de parcelas com vencimento, juros, amortizacao, saldo e
+   a situacao de cada uma (paga, vencida, a vencer). Nao e preciso
+   recalcular tabela Price nenhuma — o banco ja mandou a tabela
+   dele, que numa renegociacao nem Price e.
+=========================================================== */
+const RE_SITUACAO_PARCELA = /(PAGO EM DIA|PAGO ATRASO|PAGO NA PONTUALIDADE|PAGO PARCIAL|PARCELA RENEGOCIADA|VENCIDA|VINCENDA)/i;
+
+function lerDemonstrativoDivida(linhas) {
+  const contrato   = pegar(linhas, /Contrato atual\s+(\S+)/i);
+  const mProduto   = acharLinha(linhas, /Nome do Produto\s+(.+?)\s+Juros morat/i);
+  const produto    = mProduto ? mProduto[1].trim() : "";
+  const inicio     = dataSolta(pegar(linhas, /Data de contrata[çc][ãa]o\s+(\d{2}\/\d{2}\/\d{4})/i));
+  const taxaMes    = numeroSolto(pegar(linhas, /Taxa atual do contrato\s+([\d.,]+)\s*%/i));
+  const cetAno     = numeroSolto(pegar(linhas, /Custo Efetivo Total\s+([\d.,]+)\s*%\s*AO ANO/i));
+  const cetMes     = numeroSolto(pegar(linhas, /Custo Efetivo Total\s+([\d.,]+)\s*%\s*AO M[ÊE]S/i));
+  const contratado = numeroSolto(pegar(linhas, /Valor contratado\s+R\$\s*([\d.,-]+)/i));
+  const parcelaAtual = numeroSolto(pegar(linhas, /Valor da parcela atual\s+R\$\s*([\d.,-]+)/i));
+  const prazo      = Number(pegar(linhas, /N[úu]mero de parcelas\s+(\d+)/i)) || 0;
+  const devedor    = numeroSolto(pegar(linhas, /Saldo devedor\s*-\s*Total\s+R\$\s*([\d.,-]+)/i));
+  const vencidas   = numeroSolto(pegar(linhas, /Total parcelas vencidas\s+R\$\s*([\d.,-]+)/i));
+  const aVencer    = numeroSolto(pegar(linhas, /Total parcelas a vencer\s+R\$\s*([\d.,-]+)/i));
+  const dataBase   = dataSolta(pegar(linhas, /Data base de c[áa]lculo\s+(\d{2}\/\d{2}\/\d{4})/i));
+  const agConta    = pegar(linhas, /Ag[êe]ncia\/Conta:\s*([0-9]+\s*\/\s*[0-9\s-]+)/i).replace(/\s+/g, "");
+  const banco      = /Ita[úu]/i.test((linhas[0] || {}).texto + " " + (linhas[1] || {}).texto + " " + (linhas[2] || {}).texto) ? "Itaú" : "";
+
+  const parcelas = [];
+  linhas.forEach(l => {
+    // pedaco comprido nao e celula de tabela: e nota de rodape
+    // atravessada por cima da linha. Fora.
+    const cels = l.itens.filter(i => i.texto.length <= 40);
+    if (cels.length < 10) return;
+    if (!/^\d{1,3}\s*\/\s*\d{1,3}$/.test(cels[0].texto)) return;
+    const v = cels.map(c => c.texto);
+    const mSit = l.texto.match(RE_SITUACAO_PARCELA);
+    const situacao = mSit ? mSit[1].toUpperCase() : "";
+    const vencimento = dataSolta(v[1]);
+    if (!vencimento) return;
+    const n = Number(String(v[0]).split("/")[1]) || (parcelas.length + 1);
+    const total = numeroSolto(v[9]);
+    parcelas.push({
+      n: n,
+      vencimento: vencimento,
+      dataPagamento: dataSolta(v[2]) || "",
+      diasAtraso: Number(v[3]) || 0,
+      saldoContratual: numeroSolto(v[4]),
+      amortizacao: numeroSolto(v[5]) || 0,
+      juros: numeroSolto(v[6]) || 0,
+      multa: numeroSolto(v[7]) || 0,
+      jurosMora: numeroSolto(v[8]) || 0,
+      valor: total == null ? 0 : total,
+      valorPago: numeroSolto(v[10]) || 0,
+      situacao: situacao,
+      pago: /^PAGO/.test(situacao),
+      lancamentoId: ""
+    });
+  });
+  parcelas.sort((a, b) => a.n - b.n);
+
+  const primeira = parcelas[0];
+  return {
+    tipo: "divida",
+    banco: banco,
+    numero: contrato,
+    produto: produto,
+    dataInicio: inicio,
+    prazoMeses: prazo || parcelas.length,
+    taxaMes: taxaMes || 0,
+    cetAno: cetAno || 0,
+    cetMes: cetMes || 0,
+    valorFinanciado: contratado || 0,
+    valorParcela: parcelaAtual || (primeira ? primeira.valor : 0),
+    saldoDevedorDeclarado: devedor,
+    totalVencidas: vencidas,
+    totalAVencer: aVencer,
+    dataBase: dataBase,
+    agenciaConta: agConta,
+    diaVencimento: primeira ? Number(String(primeira.vencimento).slice(8, 10)) : 0,
+    parcelas: parcelas,
+    /* Conferencia do proprio documento: o banco diz quantas parcelas
+       o contrato tem. Se a leitura trouxer menos, faltou linha e o
+       app avisa em vez de mostrar um contrato menor do que e. */
+    conferido: !!prazo && parcelas.length === prazo,
+    lidas: parcelas.length
+  };
+}
+
+/* ===========================================================
+   EXTRATO DE CONTA EM PDF (impressao do site do banco)
+   As colunas sao alinhadas a direita, entao quem separa "valor"
+   de "saldo" e a POSICAO, nao a ordem.
+=========================================================== */
+function lerExtratoPdf(linhas) {
+  // acha o cabecalho da tabela e guarda onde ficam as colunas
+  let colValor = null, colSaldo = null, colData = null;
+  for (const l of linhas) {
+    const temData  = l.itens.filter(i => /^data$/i.test(i.texto))[0];
+    const temValor = l.itens.filter(i => /^valor(\s*\(r\$\))?$/i.test(i.texto))[0];
+    const temSaldo = l.itens.filter(i => /^saldo(\s*\(r\$\))?$/i.test(i.texto))[0];
+    if (temData && temValor) {
+      colData = temData.x; colValor = temValor.x;
+      colSaldo = temSaldo ? temSaldo.x : null;
+      break;
+    }
+  }
+  const corte = (colValor != null && colSaldo != null) ? (colValor + colSaldo) / 2 : Infinity;
+
+  const linhasExtrato = [];
+  const saldosDoDia = [];
+  linhas.forEach(l => {
+    const cels = l.itens;
+    if (cels.length < 2) return;
+    const data = dataSolta(cels[0].texto);
+    if (!data || !/^\d{2}\/\d{2}\/\d{4}$/.test(cels[0].texto)) return;
+    if (colData != null && Math.abs(cels[0].x - colData) > 25) return;
+
+    let descricao = "", valor = null, saldo = null;
+    for (let k = 1; k < cels.length; k++) {
+      const n = numeroSolto(cels[k].texto);
+      if (n == null) { descricao += (descricao ? " " : "") + cels[k].texto; continue; }
+      if (cels[k].x > corte) saldo = n; else valor = n;
+    }
+    descricao = descricao.replace(/\s+/g, " ").trim();
+
+    // "SALDO DO DIA" nao e lancamento: e o saldo declarado naquele
+    // dia. Guardado a parte, vira conferencia dia a dia.
+    if (RE_LINHA_SALDO.test(descricao)) {
+      if (saldo != null) saldosDoDia.push({ data: data, saldo: saldo });
+      else if (valor != null) saldosDoDia.push({ data: data, saldo: valor });
+      return;
+    }
+    if (valor == null || valor === 0) return;
+    linhasExtrato.push({ ordem: linhasExtrato.length, data: data, valor: valor, descricao: descricao, fitid: "", saldo: saldo });
+  });
+
+  const periodo = acharLinha(linhas, /per[íi]odo de visualiza[çc][ãa]o:\s*(\d{2}\/\d{2}\/\d{4})\s*(?:at[ée]|a)\s*(\d{2}\/\d{2}\/\d{4})/i);
+  const ini = periodo ? dataSolta(periodo[1]) : "";
+  const fim = periodo ? dataSolta(periodo[2]) : "";
+
+  // saldo final = o ultimo SALDO DO DIA que cai DENTRO do periodo.
+  // O que o banco imprime no topo e o saldo de hoje, nao o do periodo.
+  const dentro = saldosDoDia.filter(s => (!ini || s.data >= ini) && (!fim || s.data <= fim))
+    .sort((a, b) => String(a.data).localeCompare(String(b.data)));
+  const saldoFim = dentro.length ? dentro[dentro.length - 1].saldo : null;
+
+  const conta = pegar(linhas, /ag[êe]ncia:\s*([0-9]+)\s*conta:\s*([0-9-]+)/i);
+  const mConta = acharLinha(linhas, /ag[êe]ncia:\s*([0-9]+)\s*conta:\s*([0-9-]+)/i);
+
+  return {
+    tipo: "extrato",
+    formato: "PDF",
+    linhas: linhasExtrato,
+    saldosDoDia: saldosDoDia,
+    ini: ini, fim: fim,
+    saldoFim: saldoFim,
+    dataSaldo: dentro.length ? dentro[dentro.length - 1].data : "",
+    agencia: mConta ? mConta[1] : "",
+    numeroConta: mConta ? mConta[2] : ""
+  };
+}
+
+/* Porta de entrada do PDF: classifica e chama o leitor certo. */
+async function lerPdf(nomeArquivo, buffer, lib) {
+  const linhas = await pdfParaLinhas(buffer, lib);
+  const tipo = classificarPdf(linhas);
+  if (tipo === "divida")  return Object.assign(lerDemonstrativoDivida(linhas), { nome: nomeArquivo, tipo: "divida" });
+  if (tipo === "extrato") return completarExtrato(lerExtratoPdf(linhas), nomeArquivo);
+  return { tipo: tipo, nome: nomeArquivo, linhas: [], texto: linhas.slice(0, 40).map(l => l.texto).join("\n") };
+}
+
+
+/* ===========================================================
    IMPORTAR EXTRATO — a tela que recebe o arquivo do banco.
    Tres travas, as mesmas do lancamento a mao:
    1) so abre com os dados ja carregados do Dropbox;
@@ -1949,7 +2253,15 @@ function classificarLinhasExtrato(arq, conta, lancamentos, categorias) {
    3) nada parecido entra marcado — quem decide e voce.
 =========================================================== */
 
-const EXT_EXTRATO = /\.(ofx|qfx|ofc|csv|txt)$/i;
+const EXT_EXTRATO = /\.(ofx|qfx|ofc|csv|txt|pdf)$/i;
+
+/* Nome de arquivo mente; os primeiros bytes nao. */
+function ehPdf(buffer) {
+  try {
+    const b = new Uint8Array(buffer, 0, 5);
+    return b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+  } catch (e) { return false; }
+}
 
 function EtiquetaSituacao({ situacao }) {
   const mapa = {
@@ -1975,6 +2287,8 @@ function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) 
   const [daNuvem, setDaNuvem] = useState(null);      // caminho no Dropbox, quando veio de la
   const [listaDbx, setListaDbx] = useState(null);
   const [resultado, setResultado] = useState(null);
+  const [contratoNoArquivo, setContratoNoArquivo] = useState(null);
+  const [acertarSaldo, setAcertarSaldo] = useState(true);
   const entradaRef = useRef(null);
 
   const pastaConta = PASTA_ENTRADA_DBX + "/" + (conta.codigo || "");
@@ -1983,32 +2297,50 @@ function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) 
     if (!dropboxEstaConectado()) return;
     setOcupado("Procurando arquivos no Dropbox...");
     try {
-      const daPasta = await dropboxListarPasta(pastaConta);
-      const geral = await dropboxListarPasta(PASTA_ENTRADA_DBX);
-      const tudo = daPasta.map(a => Object.assign({}, a, { de: conta.codigo }))
-        .concat(geral.map(a => Object.assign({}, a, { de: "ENTRADA" })))
-        .filter(a => EXT_EXTRATO.test(a.nome));
-      setListaDbx(tudo);
+      // a pasta da conta, a caixa geral, e as caixas de nome antigo —
+      // arquivo ja enviado nao pode sumir por causa de uma renomeacao
+      const alvos = [{ p: pastaConta, de: conta.codigo }, { p: PASTA_ENTRADA_DBX, de: PASTA_ENTRADA_DBX.slice(1) }]
+        .concat(PASTAS_ENTRADA_ANTIGAS.map(p => ({ p: p, de: p.slice(1) + " (nome antigo)" })));
+      let tudo = [];
+      for (const alvo of alvos) {
+        const achados = await dropboxListarPasta(alvo.p);
+        tudo = tudo.concat(achados.map(a => Object.assign({}, a, { de: alvo.de })));
+      }
+      setListaDbx(tudo.filter(a => EXT_EXTRATO.test(a.nome)));
     } catch (e) { setErro(traduzirErro(e)); }
     setOcupado("");
   }, [pastaConta, conta.codigo]);
 
   useEffect(() => { carregarLista(); }, [carregarLista]);
 
-  const processar = (nome, buffer, caminhoDbx) => {
-    setErro("");
+  const processar = async (nome, buffer, caminhoDbx) => {
+    setErro(""); setContratoNoArquivo(null);
     try {
-      const texto = decodificarArquivo(buffer);
-      const lido = lerExtrato(nome, texto);
+      let lido;
+      if (ehPdf(buffer) || /\.pdf$/i.test(nome)) {
+        setOcupado("Lendo o PDF...");
+        lido = await lerPdf(nome, buffer);
+        setOcupado("");
+        // Contrato nao e extrato: o lugar dele e a aba Contratos.
+        if (lido.tipo === "divida") { setContratoNoArquivo(lido); return; }
+        if (lido.tipo !== "extrato") {
+          setErro("Este PDF é " + (NOME_TIPO_PDF[lido.tipo] || "um documento que não sei ler") +
+                  ". Não tem lançamento de conta para importar.");
+          return;
+        }
+      } else {
+        lido = lerExtrato(nome, decodificarArquivo(buffer));
+      }
       if (!lido.linhas.length) {
-        setErro("Não achei nenhum lançamento neste arquivo. Se for um extrato em PDF, ele ainda não entra por aqui — peça o OFX ao banco, que é o formato com o identificador de cada lançamento.");
+        setErro("Não achei nenhum lançamento neste arquivo.");
         return;
       }
       setArq(lido);
       setDaNuvem(caminhoDbx || null);
       setItens(classificarLinhasExtrato(lido, conta, dados.lancamentos, dados.categorias));
     } catch (e) {
-      setErro("Não consegui ler o arquivo: " + String((e && e.message) || e));
+      setOcupado("");
+      setErro("Não consegui ler o arquivo: " + traduzirErro(e));
     }
   };
 
@@ -2017,7 +2349,7 @@ function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) 
     if (!f) return;
     setOcupado("Lendo o arquivo...");
     const leitor = new FileReader();
-    leitor.onload = () => { setOcupado(""); processar(f.name, leitor.result, null); };
+    leitor.onload = () => { setOcupado(""); processar(f.name, leitor.result, null); };  // processar e assincrono de proposito
     leitor.onerror = () => { setOcupado(""); setErro("Não consegui abrir o arquivo."); };
     leitor.readAsArrayBuffer(f);
   };
@@ -2049,6 +2381,13 @@ function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) 
   const saldoAntes = arq ? saldoDaConta(conta, dados.lancamentos, arq.fim) : 0;
   const saldoProjetado = Math.round((saldoAntes + somaMarcados) * 100) / 100;
   const difSaldo = (arq && arq.saldoFim != null) ? Math.round((saldoProjetado - arq.saldoFim) * 100) / 100 : null;
+  /* So da para acertar o saldo inicial quando o arquivo foi lido
+     INTEIRO. Se faltou linha, mexer no saldo inicial esconderia o furo
+     em vez de mostrar. */
+  const conferenciaDias = arq ? conferirDiaADia(arq) : null;
+  const leuInteiro = !!conferenciaDias && conferenciaDias.falhas.length === 0;
+  const todosMarcados = itens.length > 0 && itens.every(i => i.marcado || i.situacao === "lancado");
+  const podeAcertar = leuInteiro && todosMarcados && difSaldo != null && Math.abs(difSaldo) >= 0.005;
 
   const importar = () => {
     const escolhidos = itens.filter(i => i.marcado);
@@ -2098,7 +2437,17 @@ function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) 
         importadoEm: agora
       };
 
+      /* O extrato foi lido inteiro (a conferencia dia a dia fecha) mas o
+         saldo nao bate: entao o que esta errado e o saldo inicial da
+         conta no cadastro. O proprio documento do banco diz qual devia
+         ser — dai o acerto sair daqui, e nao de digitacao a mao. */
+      const contas = (acertarSaldo && podeAcertar)
+        ? (d.contas || []).map(c => c.id !== conta.id ? c
+            : Object.assign({}, c, { saldoInicial: Math.round(((Number(c.saldoInicial) || 0) - difSaldo) * 100) / 100 }))
+        : (d.contas || []);
+
       return Object.assign({}, d, {
+        contas: contas,
         lancamentos: atuais.concat(novos),
         coberturas: (d.coberturas || []).concat([cobertura])
       });
@@ -2109,7 +2458,7 @@ function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) 
 
   const arquivarNoDropbox = async () => {
     if (!daNuvem) return;
-    setOcupado("Guardando o arquivo em /LANCADOS...");
+    setOcupado("Guardando o arquivo em " + PASTA_LANCADOS_DBX + "...");
     const destino = await dropboxArquivar(daNuvem);
     setOcupado("");
     setDaNuvem(null);
@@ -2140,12 +2489,12 @@ function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) 
           ) : null}
           {daNuvem ? (
             <Cartao className="p-3 flex items-center gap-2 flex-wrap">
-              <span className="text-[13px] flex-1">Tirar o arquivo da caixa de entrada e guardar em /LANCADOS?</span>
+              <span className="text-[13px] flex-1">Tirar o arquivo da caixa de entrada e guardar em {PASTA_LANCADOS_DBX}?</span>
               <Botao tom="neutro" onClick={arquivarNoDropbox} disabled={!!ocupado}>Guardar</Botao>
             </Cartao>
           ) : null}
           {resultado.arquivado ? (
-            <div className="text-[13px]" style={{ color: "var(--suave)" }}>Arquivo movido para /LANCADOS.</div>
+            <div className="text-[13px]" style={{ color: "var(--suave)" }}>Arquivo movido para {PASTA_LANCADOS_DBX}.</div>
           ) : null}
           <div className="flex justify-end"><Botao onClick={onClose}>Fechar</Botao></div>
         </div>
@@ -2166,17 +2515,24 @@ function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) 
           ) : null}
           {erro ? <Faixa tom="erro">{erro}</Faixa> : null}
           {ocupado ? <Faixa tom="aviso"><span className="inline-flex items-center gap-2"><IconLoader size={14} /> {ocupado}</span></Faixa> : null}
+          {contratoNoArquivo ? (
+            <Faixa tom="aviso">
+              Este arquivo é o <b>demonstrativo do contrato {contratoNoArquivo.numero}</b>
+              {contratoNoArquivo.produto ? " (" + contratoNoArquivo.produto + ")" : ""}, com {contratoNoArquivo.parcelas.length} parcelas.
+              Contrato não entra como extrato — importe em <b>Contratos → Importar do banco</b>, que o app monta a tabela inteira.
+            </Faixa>
+          ) : null}
 
           <Cartao className="p-3">
             <div className="text-[11px] uppercase tracking-wide mb-2" style={{ color: "var(--suave)" }}>Do aparelho</div>
-            <input ref={entradaRef} type="file" accept=".ofx,.qfx,.ofc,.csv,.txt" onChange={escolherArquivo}
+            <input ref={entradaRef} type="file" accept=".ofx,.qfx,.ofc,.csv,.txt,.pdf" onChange={escolherArquivo}
                    disabled={!dadosProntos} style={{ display: "none" }} />
             <Botao onClick={() => entradaRef.current && entradaRef.current.click()} disabled={!dadosProntos}>
               <IconUpload size={15} /> Escolher arquivo
             </Botao>
             <div className="text-[12px] mt-2" style={{ color: "var(--suave)" }}>
               OFX é o melhor: cada lançamento vem com o identificador do banco, e o mesmo arquivo importado
-              duas vezes não duplica nada. CSV também entra. PDF ainda não.
+              duas vezes não duplica nada. CSV e o PDF impresso do site do banco também entram.
             </div>
           </Cartao>
 
@@ -2191,7 +2547,7 @@ function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) 
               <div className="text-[13px]" style={{ color: "var(--suave)" }}>Procurando...</div>
             ) : !listaDbx.length ? (
               <div className="text-[13px]" style={{ color: "var(--suave)" }}>
-                Nada em <b>ENTRADA/{conta.codigo}</b> nem em <b>ENTRADA</b>. Jogue o arquivo do banco lá pelo celular e clique em atualizar.
+                Nada em <b>{PASTA_ENTRADA_DBX}/{conta.codigo}</b> nem em <b>{PASTA_ENTRADA_DBX}</b>. Jogue o arquivo do banco lá pelo celular e clique em atualizar.
               </div>
             ) : (
               <div>
@@ -2254,6 +2610,45 @@ function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) 
         ) : (
           <Faixa tom="aviso">Este arquivo não declara o saldo final, então não dá para conferir se veio completo.</Faixa>
         )}
+
+        {podeAcertar ? (
+          <Cartao className="p-3">
+            <label className="flex items-start gap-2 text-[13px]" style={{ cursor: "pointer" }}>
+              <input type="checkbox" checked={acertarSaldo} onChange={(e) => setAcertarSaldo(e.target.checked)}
+                     style={{ width: 18, height: 18, marginTop: 1, accentColor: "var(--acento)" }} />
+              <span>
+                Acertar o <b>saldo inicial desta conta</b> para {currency((Number(conta.saldoInicial) || 0) - difSaldo)},
+                que é o que faz o saldo bater com os {currency(arq.saldoFim)} que o banco declara em {dataCurta(arq.fim)}.
+                <span className="block text-[11px] mt-0.5" style={{ color: "var(--suave)" }}>
+                  O arquivo foi lido inteiro (todos os dias fecham), então a diferença é o que a conta já tinha antes deste extrato.
+                </span>
+              </span>
+            </label>
+          </Cartao>
+        ) : null}
+
+        {(() => {
+          /* A conferencia mais forte que existe: o extrato do banco
+             imprime o saldo depois de cada dia com movimento. Se todos
+             os dias fecham, o arquivo foi lido inteiro — nao sobrou nem
+             faltou linha na leitura. */
+          const c = conferenciaDias;
+          if (!c) return null;
+          if (!c.falhas.length) {
+            return (
+              <div className="text-[12px]" style={{ color: "var(--ok-claro)" }}>
+                Conferência dia a dia: os {c.dias} dias com movimento fecham com o saldo que o banco imprimiu. O arquivo foi lido inteiro.
+              </div>
+            );
+          }
+          return (
+            <Faixa tom="erro">
+              {c.falhas.length} de {c.dias} dias não fecham com o saldo impresso pelo banco
+              ({c.falhas.slice(0, 3).map(f => dataCurta(f.data) + " (" + currency(Math.abs(f.diferenca)) + ")").join(", ")}
+              {c.falhas.length > 3 ? " e outros" : ""}). Pode ser lançamento que a leitura não pegou — confira essas datas antes de importar.
+            </Faixa>
+          );
+        })()}
 
         <div className="flex items-center gap-2 flex-wrap">
           <Botao tom="neutro" onClick={() => setItens(l => l.map(i => Object.assign({}, i, { marcado: i.situacao === "novo" })))}>
@@ -2333,6 +2728,287 @@ function ModalImportarExtrato({ conta, dados, alterar, dadosProntos, onClose }) 
           <Botao tom="neutro" onClick={() => { setArq(null); setItens([]); setDaNuvem(null); }}>Trocar arquivo</Botao>
           <Botao onClick={importar} disabled={!dadosProntos || !contagem.marcados}>
             <IconCheck size={15} /> Importar {contagem.marcados || ""}
+          </Botao>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ===========================================================
+   IMPORTAR CONTRATO — o "Demonstrativo de Evolução da Dívida".
+   O banco ja manda a tabela inteira: vencimento, juros,
+   amortizacao, saldo e a situacao de cada parcela. Numa
+   renegociacao ela nem e Price (tem parcela com juros negativo),
+   entao recalcular seria inventar numero. O app IMPORTA a tabela
+   como veio e so confere se leu todas as linhas.
+=========================================================== */
+function ModalImportarContrato({ dados, alterar, dadosProntos, onClose }) {
+  const [lido, setLido] = useState(null);
+  const [erro, setErro] = useState("");
+  const [ocupado, setOcupado] = useState("");
+  const [listaDbx, setListaDbx] = useState(null);
+  const [titular, setTitular] = useState("PF");
+  const [tipo, setTipo] = useState("financiamento");
+  const [banco, setBanco] = useState("");
+  const [resultado, setResultado] = useState(null);
+  const entradaRef = useRef(null);
+
+  const carregarLista = useCallback(async () => {
+    if (!dropboxEstaConectado()) return;
+    setOcupado("Procurando PDFs no Dropbox...");
+    try {
+      const alvos = [PASTA_ENTRADA_DBX].concat(PASTAS_ENTRADA_ANTIGAS);
+      let tudo = [];
+      for (const p of alvos) {
+        const achados = await dropboxListarPasta(p);
+        tudo = tudo.concat(achados.map(a => Object.assign({}, a, { de: p.slice(1) })));
+      }
+      setListaDbx(tudo.filter(a => /\.pdf$/i.test(a.nome)));
+    } catch (e) { setErro(traduzirErro(e)); }
+    setOcupado("");
+  }, []);
+  useEffect(() => { carregarLista(); }, [carregarLista]);
+
+  const processar = async (nome, buffer) => {
+    setErro("");
+    try {
+      setOcupado("Lendo o PDF...");
+      const r = await lerPdf(nome, buffer);
+      setOcupado("");
+      if (r.tipo !== "divida") {
+        setErro("Este PDF é " + (NOME_TIPO_PDF[r.tipo] || "um documento que não reconheci") +
+                ". O que o app lê aqui é o Demonstrativo de Evolução da Dívida — é ele que traz a tabela de parcelas. " +
+                "As Condições Gerais são só o texto do contrato e não têm valor nenhum dentro.");
+        return;
+      }
+      setBanco(r.banco || "");
+      setLido(r);
+    } catch (e) { setOcupado(""); setErro("Não consegui ler o arquivo: " + traduzirErro(e)); }
+  };
+
+  const escolherArquivo = (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    const leitor = new FileReader();
+    leitor.onload = () => processar(f.name, leitor.result);
+    leitor.onerror = () => setErro("Não consegui abrir o arquivo.");
+    leitor.readAsArrayBuffer(f);
+  };
+  const pegarDoDropbox = async (item) => {
+    setOcupado("Baixando " + item.nome + "...");
+    try { const b = await dropboxBaixarBytes(item.caminho); setOcupado(""); processar(item.nome, b); }
+    catch (e) { setOcupado(""); setErro(traduzirErro(e)); }
+  };
+
+  /* Mesmo numero de contrato = e o mesmo contrato, atualizado. E o
+     que impede o mesmo financiamento entrar tres vezes por causa de
+     tres demonstrativos de meses diferentes. */
+  const jaExiste = lido && lido.numero
+    ? (dados.contratos || []).filter(c => String(c.numero || "") === String(lido.numero))[0]
+    : null;
+
+  const importar = () => {
+    const agora = new Date().toISOString();
+    const antigas = {};
+    if (jaExiste) (jaExiste.parcelas || []).forEach(p => { antigas[p.n] = p; });
+    const contrato = {
+      id: jaExiste ? jaExiste.id : uid(),
+      tipo: tipo,
+      descricao: lido.produto || ("Contrato " + lido.numero),
+      nome: lido.produto || ("Contrato " + lido.numero),
+      banco: banco || lido.banco || "",
+      numero: lido.numero,
+      titularidade: titular,
+      valorFinanciado: lido.valorFinanciado,
+      prazoMeses: lido.prazoMeses,
+      taxaMes: lido.taxaMes,
+      valorParcela: lido.valorParcela,
+      dataInicio: lido.dataInicio,
+      diaVencimento: lido.diaVencimento,
+      cetAno: lido.cetAno,
+      saldoDevedorDeclarado: lido.saldoDevedorDeclarado,
+      totalVencidas: lido.totalVencidas,
+      totalAVencer: lido.totalAVencer,
+      dataBase: lido.dataBase,
+      agenciaConta: lido.agenciaConta,
+      origem: "documento",
+      arquivo: lido.nome,
+      criadoEm: jaExiste ? (jaExiste.criadoEm || agora) : agora,
+      atualizadoEm: agora,
+      // a baixa que ja tinha sido amarrada a um lancamento nao se perde
+      parcelas: lido.parcelas.map(p => Object.assign({}, p, {
+        lancamentoId: (antigas[p.n] && antigas[p.n].lancamentoId) || ""
+      }))
+    };
+    alterar(d => {
+      const lista = d.contratos || [];
+      const existe = lista.some(c => c.id === contrato.id);
+      return Object.assign({}, d, {
+        contratos: existe ? lista.map(c => c.id === contrato.id ? contrato : c) : lista.concat([contrato])
+      });
+    });
+    setResultado({ atualizou: !!jaExiste, nome: contrato.descricao, parcelas: contrato.parcelas.length });
+  };
+
+  if (resultado) {
+    return (
+      <Modal titulo={resultado.atualizou ? "Contrato atualizado" : "Contrato importado"} onClose={onClose}>
+        <div className="space-y-3">
+          <Cartao className="p-3 text-sm">
+            {resultado.atualizou
+              ? <span>O contrato <b>{resultado.nome}</b> já existia e foi atualizado com a tabela nova ({resultado.parcelas} parcelas).</span>
+              : <span>Entrou o contrato <b>{resultado.nome}</b>, com {resultado.parcelas} parcelas.</span>}
+          </Cartao>
+          <div className="flex justify-end"><Botao onClick={onClose}>Fechar</Botao></div>
+        </div>
+      </Modal>
+    );
+  }
+
+  if (!lido) {
+    return (
+      <Modal titulo="Importar contrato do banco" onClose={onClose} largura={620}>
+        <div className="space-y-3">
+          {!dadosProntos ? <Faixa tom="erro">Os dados ainda estão carregando do Dropbox.</Faixa> : null}
+          {erro ? <Faixa tom="erro">{erro}</Faixa> : null}
+          {ocupado ? <Faixa tom="aviso"><span className="inline-flex items-center gap-2"><IconLoader size={14} /> {ocupado}</span></Faixa> : null}
+
+          <Faixa tom="aviso">
+            O arquivo certo é o <b>Demonstrativo de Evolução da Dívida</b> (no Itaú também aparece como
+            "descritivo de dívida"). É ele que traz a tabela de parcelas. Condições Gerais e contrato assinado
+            são só texto — não têm valor dentro.
+          </Faixa>
+
+          <Cartao className="p-3">
+            <div className="text-[11px] uppercase tracking-wide mb-2" style={{ color: "var(--suave)" }}>Do aparelho</div>
+            <input ref={entradaRef} type="file" accept=".pdf" onChange={escolherArquivo}
+                   disabled={!dadosProntos} style={{ display: "none" }} />
+            <Botao onClick={() => entradaRef.current && entradaRef.current.click()} disabled={!dadosProntos}>
+              <IconUpload size={15} /> Escolher PDF
+            </Botao>
+          </Cartao>
+
+          <Cartao className="p-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[11px] uppercase tracking-wide" style={{ color: "var(--suave)" }}>Da caixa de entrada do Dropbox</span>
+              <button onClick={carregarLista} className="text-[12px] underline" style={{ color: "var(--suave)" }}>atualizar</button>
+            </div>
+            {!dropboxEstaConectado() ? (
+              <div className="text-[13px]" style={{ color: "var(--suave)" }}>Dropbox não conectado.</div>
+            ) : listaDbx === null ? (
+              <div className="text-[13px]" style={{ color: "var(--suave)" }}>Procurando...</div>
+            ) : !listaDbx.length ? (
+              <div className="text-[13px]" style={{ color: "var(--suave)" }}>Nenhum PDF em {PASTA_ENTRADA_DBX}.</div>
+            ) : listaDbx.map(a => (
+              <div key={a.caminho} className="flex items-center gap-2 py-1.5" style={{ borderTop: "1px solid var(--linha)" }}>
+                <IconContrato size={14} style={{ color: "var(--suave)" }} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] truncate">{a.nome}</div>
+                  <div className="text-[11px]" style={{ color: "var(--suave)" }}>{a.de}</div>
+                </div>
+                <Botao tom="neutro" onClick={() => pegarDoDropbox(a)} disabled={!dadosProntos || !!ocupado}>Ler</Botao>
+              </div>
+            ))}
+          </Cartao>
+        </div>
+      </Modal>
+    );
+  }
+
+  const pagas = lido.parcelas.filter(p => p.pago).length;
+  const vencidas = lido.parcelas.filter(p => /VENCIDA/.test(p.situacao)).length;
+  const aVencer = lido.parcelas.filter(p => /VINCENDA/.test(p.situacao)).length;
+
+  return (
+    <Modal titulo={"Contrato " + (lido.numero || "") + " — conferir"} onClose={onClose} largura={760}>
+      <div className="space-y-3">
+        {jaExiste ? (
+          <Faixa tom="aviso">
+            Já existe um contrato com este número aqui ({jaExiste.nome}). Importar vai <b>atualizar</b> o que já existe,
+            com a tabela deste documento — não cria um segundo.
+          </Faixa>
+        ) : null}
+        {!lido.conferido ? (
+          <Faixa tom="erro">
+            O documento diz que o contrato tem {lido.prazoMeses} parcelas e eu li {lido.lidas}. Faltou linha na leitura —
+            confira antes de importar.
+          </Faixa>
+        ) : (
+          <div className="text-[12px]" style={{ color: "var(--ok-claro)" }}>
+            Li as {lido.lidas} parcelas, o mesmo número que o banco declara no documento.
+          </div>
+        )}
+
+        <div className="grade-totais">
+          <StatCard label="Valor contratado" valor={currency(lido.valorFinanciado)} icone={IconContrato}
+                    rodape={lido.dataInicio ? "desde " + dataCurta(lido.dataInicio) + "/" + String(lido.dataInicio).slice(0, 4) : ""} />
+          <StatCard label="Parcela atual" valor={currency(lido.valorParcela)} icone={IconWallet}
+                    rodape={lido.prazoMeses + "x"} />
+          <StatCard label="Saldo devedor" valor={currency(lido.saldoDevedorDeclarado)} icone={IconTrendDown} tom="perigo"
+                    rodape={lido.dataBase ? "em " + dataCurta(lido.dataBase) : ""} />
+          <StatCard label="Taxa" valor={String(lido.taxaMes).replace(".", ",") + "% a.m."} icone={IconTrendUp}
+                    rodape={lido.cetAno ? "CET " + String(lido.cetAno).replace(".", ",") + "% a.a." : ""} />
+        </div>
+
+        <Cartao className="p-3 text-[13px]">
+          <div className="flex gap-4 flex-wrap">
+            <span><b>{pagas}</b> paga{pagas === 1 ? "" : "s"}</span>
+            <span style={{ color: vencidas ? "var(--erro-claro)" : "var(--suave)" }}><b>{vencidas}</b> vencida{vencidas === 1 ? "" : "s"}</span>
+            <span><b>{aVencer}</b> a vencer</span>
+            {lido.totalVencidas ? <span style={{ color: "var(--erro-claro)" }}>em atraso: {currency(lido.totalVencidas)}</span> : null}
+          </div>
+        </Cartao>
+
+        <div className="grade-form">
+          <Campo label="Titularidade"><SeletorTitular valor={titular} onValor={setTitular} /></Campo>
+          <Campo label="Banco"><Entrada value={banco} onChange={(e) => setBanco(e.target.value)} placeholder="Itaú" /></Campo>
+          <Campo label="Tipo">
+            <Selecao value={tipo} onChange={(e) => setTipo(e.target.value)}>
+              {TIPOS_CONTRATO.map(t => <option key={t.id} value={t.id}>{t.rotulo}</option>)}
+            </Selecao>
+          </Campo>
+          <Campo label="Nome"><Entrada value={lido.produto || ""} readOnly /></Campo>
+        </div>
+
+        <Cartao className="overflow-hidden">
+          <div className="rolagem-resp" style={{ overflowX: "auto", maxHeight: "36vh", overflowY: "auto" }}>
+            <table className="tab-resp w-full text-[12px]">
+              <thead>
+                <tr style={{ background: "var(--barra)", color: "var(--na-barra-suave)" }}>
+                  <th className="text-left font-semibold px-2 py-1.5">Nº</th>
+                  <th className="text-left font-semibold px-2 py-1.5">Vencimento</th>
+                  <th className="text-right font-semibold px-2 py-1.5">Juros</th>
+                  <th className="text-right font-semibold px-2 py-1.5">Amortização</th>
+                  <th className="text-right font-semibold px-2 py-1.5">Parcela</th>
+                  <th className="text-left font-semibold px-2 py-1.5">Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lido.parcelas.map(p => (
+                  <tr key={p.n} style={{ borderTop: "1px solid var(--linha)" }}>
+                    <td className="px-2 py-1.5" data-rot="Nº" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{p.n}</td>
+                    <td className="px-2 py-1.5" data-rot="Vencimento" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                      {dataCurta(p.vencimento)}/{String(p.vencimento).slice(2, 4)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right" data-rot="Juros" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(p.juros)}</td>
+                    <td className="px-2 py-1.5 text-right" data-rot="Amortização" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(p.amortizacao)}</td>
+                    <td className="px-2 py-1.5 text-right" data-rot="Parcela" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(p.valor)}</td>
+                    <td className="px-2 py-1.5" data-rot="Situação"
+                        style={{ color: p.pago ? "var(--ok-claro)" : /VENCIDA/.test(p.situacao) ? "var(--erro-claro)" : "var(--suave)" }}>
+                      {p.situacao || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Cartao>
+
+        <div className="flex justify-end gap-2">
+          <Botao tom="neutro" onClick={() => { setLido(null); setErro(""); }}>Trocar arquivo</Botao>
+          <Botao onClick={importar} disabled={!dadosProntos}>
+            <IconCheck size={15} /> {jaExiste ? "Atualizar contrato" : "Importar contrato"}
           </Botao>
         </div>
       </div>
@@ -3314,15 +3990,30 @@ const TIPOS_CONTRATO = [
   { id: "leasing",       rotulo: "Leasing" }
 ];
 
-function AbaContratos({ dados, alterar }) {
+function AbaContratos({ dados, alterar, dadosProntos }) {
   const [filtro, setFiltro] = useState("TUDO");
   const [editando, setEditando] = useState(null);
   const [aberto, setAberto] = useState(null);
+  const [importando, setImportando] = useState(false);
 
   const cabe = (t) => filtro === "TUDO" || (t || "PF") === filtro;
   const lista = (dados.contratos || []).filter(c => cabe(c.titularidade));
 
   const salvar = (c) => {
+    /* Contrato que veio do demonstrativo do banco tem a tabela DELE.
+       Numa renegociacao ela nem e Price — tem parcela com juros
+       negativo. Recalcular aqui seria trocar o numero do banco por
+       um numero inventado. */
+    if (c.origem === "documento" && (c.parcelas || []).length) {
+      alterar(d => {
+        const existe = (d.contratos || []).some(x => x.id === c.id);
+        return Object.assign({}, d, {
+          contratos: existe ? d.contratos.map(x => x.id === c.id ? c : x) : (d.contratos || []).concat([c])
+        });
+      });
+      setEditando(null); setAberto(c.id);
+      return;
+    }
     const g = gerarParcelas(c, c.parcelas);
     const pronto = Object.assign({}, c, { parcelas: g.parcelas, taxaMes: g.taxaUsada, valorParcela: Math.round(g.parcelaUsada * 100) / 100 });
     alterar(d => {
@@ -3349,9 +4040,13 @@ function AbaContratos({ dados, alterar }) {
   /* O modal precisa existir nas DUAS telas — na lista e dentro do
      contrato aberto. Deixar so na lista fazia o botao Editar do
      painel nao abrir nada. */
-  const modal = editando
-    ? <ModalContrato inicial={editando} dados={dados} onSalvar={salvar} onClose={() => setEditando(null)} />
-    : null;
+  const modal = (
+    <>
+      {editando ? <ModalContrato inicial={editando} dados={dados} onSalvar={salvar} onClose={() => setEditando(null)} /> : null}
+      {importando ? <ModalImportarContrato dados={dados} alterar={alterar} dadosProntos={dadosProntos}
+                                           onClose={() => setImportando(false)} /> : null}
+    </>
+  );
 
   if (contratoAberto) {
     return (
@@ -3371,6 +4066,9 @@ function AbaContratos({ dados, alterar }) {
         <h2 className="text-base font-bold">Contratos</h2>
         <div className="flex items-center gap-2 flex-wrap no-print">
           <FiltroTitular valor={filtro} onValor={setFiltro} />
+          <Botao tom="neutro" onClick={() => setImportando(true)} className="no-print">
+            <IconUpload size={15} /> Importar do banco
+          </Botao>
           <Botao tom="acento" onClick={() => setEditando({ id: uid(), titularidade: filtro === "PJ" ? "PJ" : "PF" })}>
             <IconPlus size={15} /> Novo
           </Botao>
@@ -4242,15 +4940,15 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
       </Secao>
 
       <Secao titulo="Onde mandar os arquivos" icone={IconFolder}
-             sub="Dentro da pasta do app no Dropbox (Aplicativos → Prumo). Cada conta E cada cartão tem a sua pasta, porque as faturas são várias e chegam separadas.">
+             sub="Dentro da pasta do app no Dropbox (Aplicativos → PRUMO). Toda pasta daqui começa com PRUMO — a /ENTRADA sem prefixo é a do Painel de Bordo, dos fretes. Cada conta E cada cartão tem a sua, porque as faturas são várias e chegam separadas.">
         <div className="space-y-1.5 text-[13px]">
-          <div className="font-mono px-2 py-1 rounded" style={{ background: "var(--barra)" }}>/ENTRADA</div>
+          <div className="font-mono px-2 py-1 rounded" style={{ background: "var(--barra)" }}>{PASTA_ENTRADA_DBX}</div>
           <div className="text-[12px] pl-2" style={{ color: "var(--suave)" }}>
             caixa geral: jogue aqui quando não quiser pensar. O app lê o documento e descobre de qual banco é.
           </div>
           {codigos.length ? codigos.map(c => (
             <div key={c}>
-              <div className="font-mono px-2 py-1 rounded" style={{ background: "var(--barra)" }}>/ENTRADA/{c}</div>
+              <div className="font-mono px-2 py-1 rounded" style={{ background: "var(--barra)" }}>{PASTA_ENTRADA_DBX}/{c}</div>
             </div>
           )) : (
             <div className="text-[12px] pl-2" style={{ color: "var(--suave)" }}>
@@ -4260,7 +4958,7 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
           <div className="text-[12px] pl-2" style={{ color: "var(--suave)" }}>
             uma por conta: o que cai aqui já entra com o banco certo, sem depender da leitura.
           </div>
-          <div className="font-mono px-2 py-1 rounded mt-2" style={{ background: "var(--barra)" }}>/LANCADOS</div>
+          <div className="font-mono px-2 py-1 rounded mt-2" style={{ background: "var(--barra)" }}>{PASTA_LANCADOS_DBX}</div>
           <div className="text-[12px] pl-2" style={{ color: "var(--suave)" }}>
             para onde o app move o arquivo depois de lançado. Você não mexe aqui.
           </div>
@@ -4291,7 +4989,7 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
               <div className="flex items-center gap-2 flex-wrap">
                 <SeletorTitular valor={c.titularidade} onValor={(v) => mudarContaComCodigo(c.id, "titularidade", v)} />
                 <span className="text-[11px] font-mono px-2 py-1 rounded" style={{ background: "var(--barra)", color: "var(--suave)" }}>
-                  /ENTRADA/{c.codigo || "—"}
+                  {PASTA_ENTRADA_DBX}/{c.codigo || "—"}
                 </span>
                 <Botao tom="perigo" className="ml-auto" onClick={() => delLista("contas", c.id)} titulo="Remover"><IconTrash size={15} /></Botao>
               </div>
@@ -4330,7 +5028,7 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
               <div className="flex items-center gap-2 flex-wrap">
                 <SeletorTitular valor={c.titularidade} onValor={(v) => mudarCartaoComCodigo(c.id, "titularidade", v)} />
                 <span className="text-[11px] font-mono px-2 py-1 rounded" style={{ background: "var(--barra)", color: "var(--suave)" }}>
-                  /ENTRADA/{c.codigo || "—"}
+                  {PASTA_ENTRADA_DBX}/{c.codigo || "—"}
                 </span>
                 <Botao tom="perigo" className="ml-auto" onClick={() => delLista("cartoes", c.id)} titulo="Remover"><IconTrash size={15} /></Botao>
               </div>
@@ -4581,7 +5279,7 @@ function App() {
 
         {aba === "resumo" ? <AbaResumo dados={dados} mes={mes} onMes={setMes} /> : null}
         {aba === "bancos" ? <AbaBancos dados={dados} alterar={alterar} mes={mes} dadosProntos={dadosProntos} /> : null}
-        {aba === "contratos" ? <AbaContratos dados={dados} alterar={alterar} /> : null}
+        {aba === "contratos" ? <AbaContratos dados={dados} alterar={alterar} dadosProntos={dadosProntos} /> : null}
         {aba === "graficos" ? <AbaGraficos dados={dados} mes={mes} onMes={setMes} /> : null}
         {aba === "lancamentos" ? (
           <AbaLancamentos dados={dados} mes={mes} onMes={setMes} dadosProntos={dadosProntos}
