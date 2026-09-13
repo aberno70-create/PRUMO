@@ -172,7 +172,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
    Painel de Bordo: carregador + app.html, auto-atualizacao,
    Dropbox por PKCE e leitura de documento por IA.
 =========================================================== */
-const APP_VERSION = "v15";
+const APP_VERSION = "v16";
 const NOME_APP = "Prumo";
 
 /* ===========================================================
@@ -568,7 +568,46 @@ function dropboxRedirectUri() {
   return window.location.origin + pasta;
 }
 
+/* Onde o Prumo mora de verdade. So serve para uma coisa: quando o
+   arquivo e aberto direto do disco, nao ha como descobrir o endereco
+   publicado a partir da pagina — e e justamente ai que o usuario
+   precisa dele. */
+const ENDERECO_PUBLICADO = "https://aberno70-create.github.io/PRUMO/";
+
+/* ===========================================================
+   TRAVA: ARQUIVO ABERTO DO DISCO NAO CONECTA
+   Abrir o prumo-vXX.html com dois cliques no Explorer parece a mesma
+   coisa que abrir o site — a tela e identica. Mas dai o endereco e
+   "file:///C:/..." e o app manda ISSO como endereco de retorno. O
+   Dropbox mostra a tela de autorizar, o usuario clica em Permitir, e
+   o Chrome se recusa a sair de https para file: — ERR_UNSAFE_REDIRECT,
+   numa pagina do dropbox.com, sem uma palavra sobre o Prumo.
+   Ninguem adivinha isso. Entao o app CONFERE E IMPEDE antes de sair
+   da tela, em vez de deixar o Chrome dar a noticia la na frente.
+=========================================================== */
+function dropboxPodeConectar() {
+  const prot = (typeof window !== "undefined" && window.location.protocol) || "";
+  if (prot === "https:") return { pode: true, motivo: "" };
+  /* http://localhost e o banco de testes — ali conectar tambem nao
+     serve, mas a checagem nao pode atrapalhar quem esta testando. */
+  if (prot === "http:" && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
+    return { pode: true, motivo: "" };
+  }
+  if (prot === "file:") {
+    return { pode: false, tipo: "arquivo", motivo:
+      "Este arquivo está aberto direto do computador, não pelo endereço do Prumo na internet. " +
+      "Assim o Dropbox até mostra a tela de autorizar, mas na volta o Chrome bloqueia " +
+      "(ERR_UNSAFE_REDIRECT) — ele não deixa um site devolver para um arquivo do disco. " +
+      "Abra o Prumo pelo endereço e conecte por lá; esta cópia do disco também não se atualiza sozinha." };
+  }
+  return { pode: false, tipo: "endereco", motivo:
+    "O Prumo está aberto num endereço que o Dropbox não aceita de volta (" + prot + "). " +
+    "Abra pelo endereço publicado e conecte por lá." };
+}
+
 async function dropboxIniciarLogin(appKey) {
+  const trava = dropboxPodeConectar();
+  if (!trava.pode) { dbxAnotarErro("antes de sair para o Dropbox", "", trava.motivo); return false; }
   const verifier = dropboxGerarVerifier();
   localStorage.setItem(LS_DROPBOX.verifier, verifier);
   localStorage.setItem(LS_DROPBOX.appKey, appKey);
@@ -582,6 +621,7 @@ async function dropboxIniciarLogin(appKey) {
     redirect_uri: dropboxRedirectUri()
   });
   window.location.href = "https://www.dropbox.com/oauth2/authorize?" + params.toString();
+  return true;
 }
 
 async function dropboxTrocarCodigoPorToken(code) {
@@ -5181,6 +5221,9 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
      "nao conectou" e pior do que nao ter indicador nenhum. */
   const autorizacaoCaiu = !!(ultimoErro && /renovar token|troca de codigo/.test(ultimoErro.onde));
   const valendo = conectado && !autorizacaoCaiu;
+  /* Arquivo aberto do disco nao conecta — e precisa dizer isso ANTES
+     do clique, nao depois, la numa pagina do dropbox.com. */
+  const trava = typeof window !== "undefined" ? dropboxPodeConectar() : { pode: true };
   /* Cada conta E cada cartao tem pasta propria: as faturas sao
      varias e chegam separadas. */
   const codigos = (dados.contas || []).concat(dados.cartoes || []).map(c => c.codigo).filter(Boolean);
@@ -5292,6 +5335,23 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
               </Botao>
             </div>
           </Campo>
+          {!trava.pode ? (
+            <Faixa tom="erro">
+              <b>Não dá para conectar o Dropbox por aqui.</b> {trava.motivo}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <a href={ENDERECO_PUBLICADO} target="_blank" rel="noopener"
+                   className="underline font-bold" style={{ color: "var(--acento-vivo)", wordBreak: "break-all" }}>
+                  {ENDERECO_PUBLICADO}
+                </a>
+                <button className="underline" style={{ color: "var(--suave)" }}
+                        onClick={() => {
+                          try { navigator.clipboard.writeText(ENDERECO_PUBLICADO); setMsg("Endereço copiado."); }
+                          catch (e) { setMsg(ENDERECO_PUBLICADO); }
+                        }}>copiar o endereço</button>
+              </div>
+            </Faixa>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-2">
             {valendo ? (
               <>
@@ -5306,7 +5366,7 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
                 {autorizacaoCaiu ? (
                   <span className="text-[13px]" style={{ color: "var(--erro-claro)" }}>● Autorização recusada — conecte de novo</span>
                 ) : null}
-                <Botao tom="acento" disabled={!appKey} onClick={() => dropboxIniciarLogin(appKey)}>
+                <Botao tom="acento" disabled={!appKey || !trava.pode} onClick={() => dropboxIniciarLogin(appKey)}>
                   <IconCloud size={15} /> Conectar o Dropbox
                 </Botao>
                 {conectado ? (
@@ -5355,6 +5415,8 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
               <div>Autorização guardada neste aparelho: <b>{conectado ? "sim" : "não"}</b></div>
               <div>Endereço aberto agora: <b style={{ wordBreak: "break-all" }}>
                 {typeof window !== "undefined" ? window.location.href.split("?")[0] : ""}</b></div>
+              <div>Aberto como: <b style={{ color: trava.pode ? "var(--ok-claro)" : "var(--erro-claro)" }}>
+                {trava.pode ? "site (serve para conectar)" : "arquivo do disco (NÃO serve para conectar)"}</b></div>
             </div>
 
             {ultimoErro ? (
