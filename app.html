@@ -172,7 +172,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
    Painel de Bordo: carregador + app.html, auto-atualizacao,
    Dropbox por PKCE e leitura de documento por IA.
 =========================================================== */
-const APP_VERSION = "v14";
+const APP_VERSION = "v15";
 const NOME_APP = "Prumo";
 
 /* ===========================================================
@@ -465,6 +465,60 @@ const LS_DROPBOX = {
 };
 
 const NOME_ARQUIVO_DROPBOX = "/prumo-dados.json";
+
+/* ===========================================================
+   CAIXA-PRETA DO DROPBOX
+   Cada falha aqui virava uma palavra ("FALHA_LEITURA") e a mensagem
+   do proprio Dropbox — que diz exatamente o que esta errado — era
+   jogada fora. Resultado: "nao conecta" sem nenhuma pista, nem para
+   quem usa nem para quem conserta.
+   Agora toda falha fica gravada: onde foi, o codigo HTTP e o texto
+   que o Dropbox devolveu. Sobrevive ao recarregar a pagina, porque o
+   erro do login acontece justamente durante uma navegacao.
+=========================================================== */
+const LS_DBX_ERRO = "prumo_dropbox_ultimo_erro";
+
+function dbxAnotarErro(onde, status, corpo) {
+  const reg = {
+    quando: new Date().toISOString(),
+    onde: String(onde || ""),
+    status: status == null ? "" : String(status),
+    corpo: String(corpo || "").slice(0, 400)
+  };
+  try { localStorage.setItem(LS_DBX_ERRO, JSON.stringify(reg)); } catch (e) {}
+  return reg;
+}
+function dbxUltimoErro() {
+  try { const r = localStorage.getItem(LS_DBX_ERRO); return r ? JSON.parse(r) : null; }
+  catch (e) { return null; }
+}
+function dbxLimparErro() {
+  try { localStorage.removeItem(LS_DBX_ERRO); } catch (e) {}
+}
+
+/* O corpo de erro do Dropbox e JSON: {"error":"invalid_grant",
+   "error_description":"..."} ou {"error_summary":"path/not_found/..."}.
+   Vira uma frase legivel; se nao for JSON, devolve o texto cru. */
+function dbxTextoDoErro(corpo) {
+  const t = String(corpo || "").trim();
+  if (!t) return "";
+  try {
+    const j = JSON.parse(t);
+    const partes = [];
+    if (j.error_summary) partes.push(j.error_summary);
+    if (typeof j.error === "string") partes.push(j.error);
+    else if (j.error && j.error[".tag"]) partes.push(j.error[".tag"]);
+    if (j.error_description) partes.push(j.error_description);
+    return partes.length ? partes.join(" — ") : t.slice(0, 200);
+  } catch (e) { return t.slice(0, 200); }
+}
+
+/* Le o corpo sem nunca estourar: resposta ja consumida ou sem corpo
+   nao pode derrubar o tratamento do erro. */
+async function dbxCorpo(resp) {
+  try { return await resp.text(); } catch (e) { return ""; }
+}
+
 /* O nome da pasta carrega o nome do app DE PROPOSITO. O Painel de
    Bordo tem uma /ENTRADA e uma /LANCADOS dele, e no celular as duas
    apareciam com o mesmo nome — era so uma questao de tempo ate um
@@ -533,15 +587,33 @@ async function dropboxIniciarLogin(appKey) {
 async function dropboxTrocarCodigoPorToken(code) {
   const appKey = dropboxAppKeyAtual();
   const verifier = localStorage.getItem(LS_DROPBOX.verifier);
-  if (!appKey || !verifier) return false;
+  if (!appKey) { dbxAnotarErro("troca de codigo", "", "Sem App Key gravada no aparelho."); return false; }
+  /* O verifier e escrito antes de sair para o Dropbox e lido na volta.
+     Sumiu no caminho = o navegador limpou o armazenamento do site, ou
+     a ida e a volta cairam em enderecos diferentes (com e sem www, ou
+     uma aba anonima). Sem ele o PKCE nao fecha, e o codigo ja veio. */
+  if (!verifier) {
+    dbxAnotarErro("troca de codigo", "", "O verificador do login sumiu do aparelho entre a ida e a volta do Dropbox. Costuma ser navegacao anonima, limpeza de dados do site, ou a volta ter caido num endereco diferente do de partida.");
+    return false;
+  }
   const params = new URLSearchParams({
     code: code, grant_type: "authorization_code", client_id: appKey,
     code_verifier: verifier, redirect_uri: dropboxRedirectUri()
   });
-  const resp = await fetch("https://api.dropboxapi.com/oauth2/token", {
-    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: params.toString()
-  });
-  if (!resp.ok) return false;
+  let resp;
+  try {
+    resp = await fetch("https://api.dropboxapi.com/oauth2/token", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: params.toString()
+    });
+  } catch (e) {
+    dbxAnotarErro("troca de codigo", "rede", "Nao consegui falar com api.dropboxapi.com: " + (e && e.message ? e.message : e));
+    return false;
+  }
+  if (!resp.ok) {
+    dbxAnotarErro("troca de codigo", resp.status, await dbxCorpo(resp));
+    return false;
+  }
+  dbxLimparErro();
   const dados = await resp.json();
   localStorage.setItem(LS_DROPBOX.accessToken, dados.access_token);
   if (dados.refresh_token) localStorage.setItem(LS_DROPBOX.refreshToken, dados.refresh_token);
@@ -555,10 +627,20 @@ async function dropboxRenovarToken() {
   const refreshToken = localStorage.getItem(LS_DROPBOX.refreshToken);
   if (!appKey || !refreshToken) return false;
   const params = new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: appKey });
-  const resp = await fetch("https://api.dropboxapi.com/oauth2/token", {
-    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: params.toString()
-  });
-  if (!resp.ok) return false;
+  let resp;
+  try {
+    resp = await fetch("https://api.dropboxapi.com/oauth2/token", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: params.toString()
+    });
+  } catch (e) {
+    dbxAnotarErro("renovar token", "rede", "Nao consegui falar com api.dropboxapi.com: " + (e && e.message ? e.message : e));
+    return false;
+  }
+  /* Renovacao recusada = a autorizacao foi revogada (no site do
+     Dropbox, ou porque o app foi apagado e recriado). O app precisa
+     DIZER isso: senao fica eternamente "desconectado" sem motivo. */
+  if (!resp.ok) { dbxAnotarErro("renovar token", resp.status, await dbxCorpo(resp)); return false; }
+  dbxLimparErro();
   const dados = await resp.json();
   localStorage.setItem(LS_DROPBOX.accessToken, dados.access_token);
   localStorage.setItem(LS_DROPBOX.expiraEm, String(Date.now() + (dados.expires_in - 60) * 1000));
@@ -598,7 +680,7 @@ async function dropboxLerDados() {
     headers: { Authorization: "Bearer " + token, "Dropbox-API-Arg": dropboxArg({ path: NOME_ARQUIVO_DROPBOX }) }
   });
   if (resp.status === 409) return null; // ainda nao existe: normal na primeira conexao
-  if (!resp.ok) throw new Error("FALHA_LEITURA");
+  if (!resp.ok) { dbxAnotarErro("ler o arquivo de dados", resp.status, await dbxCorpo(resp)); throw new Error("FALHA_LEITURA"); }
   const texto = await resp.text();
   return texto ? JSON.parse(texto) : null;
 }
@@ -615,7 +697,7 @@ async function dropboxEscreverDados(dados) {
     },
     body: JSON.stringify(dados)
   });
-  if (!resp.ok) throw new Error("FALHA_ESCRITA");
+  if (!resp.ok) { dbxAnotarErro("gravar o arquivo de dados", resp.status, await dbxCorpo(resp)); throw new Error("FALHA_ESCRITA"); }
 }
 
 async function dropboxRpc(endpoint, corpo) {
@@ -627,14 +709,16 @@ async function dropboxRpc(endpoint, corpo) {
     body: JSON.stringify(corpo)
   });
   if (resp.status === 401 || resp.status === 403) {
-    const t = await resp.text();
+    const t = await dbxCorpo(resp);
+    dbxAnotarErro(endpoint, resp.status, t);
     if (/scope/i.test(t)) throw new Error("SEM_PERMISSAO_LISTAR");
     throw new Error("SEM_TOKEN");
   }
   if (!resp.ok) {
-    const t = await resp.text();
-    if (/not_found/.test(t)) return null;
-    throw new Error("FALHA_DROPBOX: " + t.slice(0, 120));
+    const t = await dbxCorpo(resp);
+    if (/not_found/.test(t)) return null;   // pasta que ainda nao existe nao e erro
+    dbxAnotarErro(endpoint, resp.status, t);
+    throw new Error("FALHA_DROPBOX: " + dbxTextoDoErro(t));
   }
   return resp.json();
 }
@@ -664,7 +748,7 @@ async function dropboxBaixarBytes(caminho) {
     method: "POST",
     headers: { Authorization: "Bearer " + token, "Dropbox-API-Arg": dropboxArg({ path: caminho }) }
   });
-  if (!resp.ok) throw new Error("FALHA_LEITURA");
+  if (!resp.ok) { dbxAnotarErro("baixar arquivo da caixa de entrada", resp.status, await dbxCorpo(resp)); throw new Error("FALHA_LEITURA"); }
   return resp.arrayBuffer();
 }
 
@@ -678,6 +762,43 @@ async function dropboxArquivar(caminho) {
     await dropboxRpc("files/move_v2", { from_path: caminho, to_path: destino, autorename: true });
     return destino;
   } catch (e) { return ""; }
+}
+
+/* TESTAR AGORA — a pergunta "esta conectado?" respondida por quem
+   manda: o Dropbox. Nao olha o que esta guardado no aparelho, faz uma
+   chamada de verdade e devolve o nome da conta ou o motivo da recusa.
+   Nao escreve nada e nao depende de o arquivo de dados existir. */
+async function dropboxTestar() {
+  const appKey = dropboxAppKeyAtual();
+  if (!appKey) return { ok: false, passo: "App Key", detalhe: "Nenhuma App Key gravada neste aparelho." };
+  if (!localStorage.getItem(LS_DROPBOX.refreshToken)) {
+    return { ok: false, passo: "autorização", detalhe: "Este aparelho nunca completou a conexão (não há autorização guardada). Toque em Conectar o Dropbox." };
+  }
+  let token;
+  try { token = await dropboxTokenValido(); }
+  catch (e) { return { ok: false, passo: "renovar token", detalhe: String(e && e.message ? e.message : e) }; }
+  if (!token) {
+    const erro = dbxUltimoErro();
+    return { ok: false, passo: "renovar token",
+      detalhe: erro ? (dbxTextoDoErro(erro.corpo) || erro.corpo) : "O Dropbox não devolveu um token novo. A autorização pode ter sido revogada." };
+  }
+  let resp;
+  try {
+    resp = await fetch("https://api.dropboxapi.com/2/users/get_current_account", {
+      method: "POST", headers: { Authorization: "Bearer " + token }
+    });
+  } catch (e) {
+    return { ok: false, passo: "rede", detalhe: "Não consegui falar com o Dropbox: " + (e && e.message ? e.message : e) };
+  }
+  const corpo = await dbxCorpo(resp);
+  if (!resp.ok) {
+    dbxAnotarErro("users/get_current_account", resp.status, corpo);
+    return { ok: false, passo: "HTTP " + resp.status, detalhe: dbxTextoDoErro(corpo) };
+  }
+  dbxLimparErro();
+  let conta = "";
+  try { const j = JSON.parse(corpo); conta = (j.name && j.name.display_name) || j.email || ""; } catch (e) {}
+  return { ok: true, passo: "conectado", detalhe: conta ? ("Conta: " + conta) : "Conexão respondendo." };
 }
 
 async function dropboxGarantirPastas(codigos) {
@@ -1458,14 +1579,20 @@ function Modal({ titulo, onClose, children, largura = 560 }) {
   );
 }
 
+/* Tres tons: aviso, erro e OK. O "ok" existe porque dar uma boa
+   noticia com triangulo de perigo do lado faz o leitor duvidar dela —
+   e a faixa de "conectado" precisa ser inconfundivel. */
 function Faixa({ tom = "aviso", children }) {
-  const fundo = tom === "erro" ? "var(--erro-bg)" : "var(--aviso-bg)";
-  const borda = tom === "erro" ? "var(--erro-borda)" : "var(--aviso-borda)";
-  const cor   = tom === "erro" ? "var(--erro-txt)" : "var(--ouro-escuro)";
+  const ok    = tom === "ok";
+  const erro  = tom === "erro";
+  const fundo = erro ? "var(--erro-bg)" : ok ? "var(--superficie)" : "var(--aviso-bg)";
+  const borda = erro ? "var(--erro-borda)" : ok ? "var(--ok)" : "var(--aviso-borda)";
+  const cor   = erro ? "var(--erro-txt)" : ok ? "var(--ok-claro)" : "var(--ouro-escuro)";
+  const IconeC = ok ? IconCheck : IconAlert;
   return (
     <div className="flex items-start gap-2 rounded-md px-3 py-2 text-[13px] no-print"
          style={{ background: fundo, border: "1px solid " + borda, color: cor }}>
-      <IconAlert size={15} className="shrink-0 mt-0.5" />
+      <IconeC size={15} className="shrink-0 mt-0.5" />
       <div>{children}</div>
     </div>
   );
@@ -5040,6 +5167,20 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
   const [msg, setMsg] = useState("");
   const conectado = dropboxEstaConectado();
   const redirect = typeof window !== "undefined" ? dropboxRedirectUri() : "";
+  /* Diagnostico: "nao conecta" nunca deveria ser o fim da frase. Aqui
+     o app mostra o que o Dropbox respondeu, palavra por palavra, e faz
+     uma chamada de verdade quando pedido. */
+  const [teste, setTeste] = useState(null);
+  const [testando, setTestando] = useState(false);
+  const [erroVez, setErroVez] = useState(0);  // redesenha depois de limpar/testar
+  const ultimoErro = typeof window !== "undefined" ? dbxUltimoErro() : null;
+  /* "Conectado" nao pode ser so "tem um papel guardado no bolso". Se a
+     ultima conversa com o Dropbox foi uma recusa de autorizacao, o que
+     esta guardado nao vale mais — e a tela precisa dizer isso, com o
+     botao de conectar de novo a mao. Ficar verde enquanto o teste diz
+     "nao conectou" e pior do que nao ter indicador nenhum. */
+  const autorizacaoCaiu = !!(ultimoErro && /renovar token|troca de codigo/.test(ultimoErro.onde));
+  const valendo = conectado && !autorizacaoCaiu;
   /* Cada conta E cada cartao tem pasta propria: as faturas sao
      varias e chegam separadas. */
   const codigos = (dados.contas || []).concat(dados.cartoes || []).map(c => c.codigo).filter(Boolean);
@@ -5152,7 +5293,7 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
             </div>
           </Campo>
           <div className="flex flex-wrap items-center gap-2">
-            {conectado ? (
+            {valendo ? (
               <>
                 <span className="text-[13px]" style={{ color: "var(--ok-claro)" }}>● Conectado</span>
                 <Botao tom="neutro" onClick={async () => { const p = await dropboxGarantirPastas(codigos); setMsg("Pastas conferidas: " + p.join(", ")); }}>
@@ -5161,9 +5302,19 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
                 <Botao tom="perigo" onClick={() => { dropboxDesconectar(); setMsg("Desconectado. Recarregue para começar de novo."); }}>Desconectar</Botao>
               </>
             ) : (
-              <Botao tom="acento" disabled={!appKey} onClick={() => dropboxIniciarLogin(appKey)}>
-                <IconCloud size={15} /> Conectar o Dropbox
-              </Botao>
+              <>
+                {autorizacaoCaiu ? (
+                  <span className="text-[13px]" style={{ color: "var(--erro-claro)" }}>● Autorização recusada — conecte de novo</span>
+                ) : null}
+                <Botao tom="acento" disabled={!appKey} onClick={() => dropboxIniciarLogin(appKey)}>
+                  <IconCloud size={15} /> Conectar o Dropbox
+                </Botao>
+                {conectado ? (
+                  <Botao tom="neutro" onClick={() => { dropboxDesconectar(); dbxLimparErro(); setErroVez(v => v + 1); setMsg("Limpo. Toque em Conectar o Dropbox."); }}>
+                    Esquecer o que está guardado
+                  </Botao>
+                ) : null}
+              </>
             )}
           </div>
           <div className="text-[12px]" style={{ color: "var(--suave)" }}>
@@ -5173,6 +5324,61 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
             {statusSalvar ? " · gravação: " + (statusSalvar === "salvo" ? "salvo no Dropbox" : statusSalvar === "salvando" ? "salvando..." : statusSalvar === "erro" ? "falhou" : "só local") : ""}
           </div>
           {erroCarga ? <Faixa tom="erro">{erroCarga} <button className="underline" onClick={recarregar}>Tentar de novo</button></Faixa> : null}
+
+          {/* ---- Diagnóstico ---- */}
+          <div className="rounded-lg p-3 space-y-2" style={{ background: "var(--fundo)", border: "1px solid var(--borda)" }}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Botao tom="neutro" disabled={testando} onClick={async () => {
+                setTestando(true); setTeste(null);
+                try { setTeste(await dropboxTestar()); }
+                catch (e) { setTeste({ ok: false, passo: "erro", detalhe: String(e && e.message ? e.message : e) }); }
+                setTestando(false);
+                setErroVez(v => v + 1);   // o teste pode ter criado (ou apagado) a recusa
+              }}>
+                {testando ? <IconLoader size={15} /> : <IconCloud size={15} />} Testar a conexão agora
+              </Botao>
+              <span className="text-[12px]" style={{ color: "var(--suave)" }}>
+                pergunta ao próprio Dropbox, não ao que está guardado aqui
+              </span>
+            </div>
+
+            {teste ? (
+              <Faixa tom={teste.ok ? "ok" : "erro"}>
+                {teste.ok ? "Conectado. " : "Não conectou — parou em: " + teste.passo + ". "}
+                {teste.detalhe}
+              </Faixa>
+            ) : null}
+
+            <div className="text-[12px] leading-relaxed" style={{ color: "var(--suave)" }}>
+              <div>App Key em uso: <b>{appKey || "(nenhuma)"}</b></div>
+              <div>Endereço de retorno que este aparelho manda: <b style={{ wordBreak: "break-all" }}>{redirect}</b></div>
+              <div>Autorização guardada neste aparelho: <b>{conectado ? "sim" : "não"}</b></div>
+              <div>Endereço aberto agora: <b style={{ wordBreak: "break-all" }}>
+                {typeof window !== "undefined" ? window.location.href.split("?")[0] : ""}</b></div>
+            </div>
+
+            {ultimoErro ? (
+              <div key={erroVez} className="text-[12px] rounded p-2" style={{ background: "var(--superficie)", border: "1px solid var(--borda)" }}>
+                <div style={{ color: "var(--erro-claro)" }}>
+                  <b>Última recusa do Dropbox</b> — em “{ultimoErro.onde}”
+                  {ultimoErro.status ? " (" + ultimoErro.status + ")" : ""}
+                </div>
+                <div style={{ color: "var(--texto)", wordBreak: "break-word" }}>
+                  {dbxTextoDoErro(ultimoErro.corpo) || ultimoErro.corpo}
+                </div>
+                <div className="flex gap-2 mt-1">
+                  <button className="underline" style={{ color: "var(--suave)" }}
+                          onClick={() => {
+                            const t = ultimoErro.quando + " | " + ultimoErro.onde + " | " + ultimoErro.status + " | " + ultimoErro.corpo;
+                            try { navigator.clipboard.writeText(t); setMsg("Erro copiado — é só colar no chat."); }
+                            catch (e) { setMsg(t); }
+                          }}>copiar o erro inteiro</button>
+                  <button className="underline" style={{ color: "var(--suave)" }}
+                          onClick={() => { dbxLimparErro(); setErroVez(v => v + 1); setMsg("Registro de erro apagado."); }}>limpar</button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </Secao>
 
@@ -5469,7 +5675,17 @@ function App() {
         await dropboxGarantirPastas(codigos);
         setAvisoDbx(""); recarregar();
       }
-      else setAvisoDbx("O Dropbox recusou a autorização. Confira se o endereço de retorno cadastrado é exatamente " + dropboxRedirectUri());
+      else {
+        /* Nunca mais "recusou" sem dizer por que. O motivo vem do
+           proprio Dropbox e fica guardado, para ainda estar la quando
+           ele abrir os Ajustes. */
+        const e = dbxUltimoErro();
+        const motivo = e ? (dbxTextoDoErro(e.corpo) || e.corpo) : "";
+        setAvisoDbx("O Dropbox recusou a autorização"
+          + (motivo ? ": " + motivo : ".")
+          + " O endereço de retorno que este aparelho mandou foi " + dropboxRedirectUri()
+          + " — ele tem que estar cadastrado igualzinho no app do Dropbox. Em Ajustes → Dropbox há o botão “Testar a conexão agora”.");
+      }
     })();
   }, [recarregar]);
 
