@@ -172,7 +172,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
    Painel de Bordo: carregador + app.html, auto-atualizacao,
    Dropbox por PKCE e leitura de documento por IA.
 =========================================================== */
-const APP_VERSION = "v11";
+const APP_VERSION = "v14";
 const NOME_APP = "Prumo";
 
 /* ===========================================================
@@ -344,7 +344,13 @@ const IC = {
   salario:      (p) => <Icon {...p}><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 8.5h20"/><circle cx="12" cy="14" r="2.2"/></Icon>,
   prolabore:    (p) => <Icon {...p}><rect x="2.5" y="7" width="19" height="13" rx="2"/><path d="M8.5 7V5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v2"/><path d="M2.5 12.5h19"/></Icon>,
   empresa:      (p) => <Icon {...p}><path d="M3 21V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15"/><path d="M13 10h7a1 1 0 0 1 1 1v10"/><path d="M2 21h20"/><path d="M6.5 9h3M6.5 13h3M16.5 14h1.5M16.5 17.5h1.5"/></Icon>,
-  extras:       (p) => <Icon {...p}><path d="M12 2.5l2.9 5.9 6.6 1-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5-4.8-4.6 6.6-1z"/></Icon>
+  juros:        (p) => <Icon {...p}><circle cx="7" cy="7" r="2.4"/><circle cx="17" cy="17" r="2.4"/><path d="M19 5L5 19"/></Icon>,
+  extras:       (p) => <Icon {...p}><path d="M12 2.5l2.9 5.9 6.6 1-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5-4.8-4.6 6.6-1z"/></Icon>,
+  /* Entraram na v14, com a conta PJ: o caminhao e a chave inglesa.
+     Sem eles o faturamento de frete caia em "Extras" e pneu, embreagem
+     e peca caiam em "Outros" — 39 e 260 linhas respectivamente. */
+  frete:        (p) => <Icon {...p}><path d="M2 7.5h11v9H2z"/><path d="M13 10.5h4l3 3.2v2.8h-7z"/><circle cx="6.5" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></Icon>,
+  manutencao:   (p) => <Icon {...p}><path d="M15.2 5.4a4.2 4.2 0 0 0-5.6 5.2l-6 6a1.6 1.6 0 0 0 2.3 2.3l6-6a4.2 4.2 0 0 0 5.2-5.6l-2.5 2.5-2-2z"/></Icon>
 };
 
 const ICONES_CATEGORIA = [
@@ -372,7 +378,10 @@ const ICONES_CATEGORIA = [
   { id: "salario",      rotulo: "Salário" },
   { id: "prolabore",    rotulo: "Pró-labore" },
   { id: "empresa",      rotulo: "Empresa" },
+  { id: "juros",        rotulo: "Juros e tarifas" },
   { id: "extras",       rotulo: "Extras" },
+  { id: "frete",        rotulo: "Frete" },
+  { id: "manutencao",   rotulo: "Manutenção" },
   { id: "outros",       rotulo: "Outros" }
 ];
 
@@ -380,11 +389,15 @@ const ICONES_CATEGORIA = [
    desenho pelo nome, sem ninguem ter que escolher na mao. */
 const PALPITES_ICONE = [
   [/mercado|supermerc|feira|acougue|padaria|hortifr/, "mercado"],
-  [/combust|gasolin|posto|etanol|diesel|alcool/, "combustivel"],
+  /* "posto" precisa de borda: sem ela, "impostos e taxas" casa aqui —
+     a regra de combustivel vem antes da de imposto — e toda a despesa
+     de DAS, DARF e Simples ia parar no grafico de combustivel. */
+  [/combust|gasolin|\bposto|etanol|diesel|alcool/, "combustivel"],
   [/saude|farmac|medic|remedi|dentist|hospital|plano de saude|exame/, "saude"],
   [/casa|moradia|aluguel|condomin|reforma|movei/, "casa"],
   [/conta.*fixa|luz|energia|agua|esgoto|gas\b/, "contas"],
   [/educa|escola|faculdad|curso|mensalidade|livro|material escolar/, "educacao"],
+  [/manutenc|oficina|pneu|peca|pecas|retifica|funilaria|mecanic|revisao/, "manutencao"],
   [/transport|uber|onibus|taxi|estacionament|pedagi|carro|veicul/, "transporte"],
   [/aliment|restaurant|lanche|comida|delivery|ifood|refeic/, "restaurante"],
   [/lazer|cinema|show|streaming|netflix|spotify|divers|bar\b/, "lazer"],
@@ -398,11 +411,15 @@ const PALPITES_ICONE = [
   [/internet|banda larga|wifi|provedor/, "internet"],
   [/academia|ginast|crossfit|pilates|esporte/, "academia"],
   [/seguro/, "seguro"],
-  [/doacao|dizimo|caridad|igreja|oferta/, "doacao"],
-  [/investiment|aplicac|poupanc|renda fixa|acoes|tesouro/, "investimento"],
+  /* "doaca" pega singular e plural. E "acoes" precisa de borda, senao
+     "doacoes" cai em investimento — foi o que aconteceu ate a v13. */
+  [/doac|dizimo|caridad|igreja|oferta/, "doacao"],
+  [/investiment|aplicac|poupanc|renda fixa|\bacoes\b|tesouro/, "investimento"],
+  [/frete|\bcte\b|conhecimento de transporte|faturament/, "frete"],
   [/salari|holerite|folha/, "salario"],
   [/pro.?labore/, "prolabore"],
   [/retirada|empresa|distribuic|lucro|dividend/, "empresa"],
+  [/juros|tarifa|encargo|iof|multa|mora/, "juros"],
   [/extra|bonus|freela|adicional|premio|estrela/, "extras"]
 ];
 
@@ -712,7 +729,19 @@ const CATEGORIAS_PADRAO = [
   { nome: "Salário",             tipo: "receita", repetitiva: false },
   { nome: "Pró-labore",          tipo: "receita", repetitiva: false },
   { nome: "Retirada da empresa", tipo: "receita", repetitiva: false },
-  { nome: "Extras",              tipo: "receita", repetitiva: true  }
+  { nome: "Extras",              tipo: "receita", repetitiva: true  },
+  /* Entraram na v13, depois que o extrato do C6 mostrou 60 linhas de
+     juros, IOF e multa de cheque especial caindo todas em "Outros".
+     Vao no FIM da lista de proposito: o id da categoria e a posicao,
+     e mexer no meio trocaria a categoria de lancamento ja gravado. */
+  { nome: "Juros e tarifas",   tipo: "despesa", repetitiva: true  },
+  { nome: "Seguros",           tipo: "despesa", repetitiva: false },
+  { nome: "Doações",           tipo: "despesa", repetitiva: false },
+  /* Entraram na v14, com a conta PJ do C6. Faturamento de frete estava
+     caindo em "Extras" e pneu/embreagem/peca em "Outros". Tambem vao no
+     FIM: o id e a posicao na lista. */
+  { nome: "Fretes",                 tipo: "receita", repetitiva: true  },
+  { nome: "Manutenção do veículo",  tipo: "despesa", repetitiva: true  }
 ];
 
 function categoriasIniciais() {
@@ -833,11 +862,30 @@ function procurarPossivelDuplicado(lista, novo) {
     const dist = diasEntre(l.data, novo.data);
     if (dist > 3) continue;
 
+    /* CONTAS DIFERENTES NAO SAO A MESMA SAIDA DE DINHEIRO.
+       Um pix de R$ 500 na conta PF e outro de R$ 500 na conta PJ no
+       mesmo dia sao duas saidas — o dinheiro sai de um lugar so. Sem
+       esta trava, o segundo extrato do mesmo banco chega e a base
+       engole lancamentos de verdade, que e o erro caro: some dinheiro
+       da conta e o saldo nunca mais fecha.
+       A duvida continua de pe quando um dos lados ainda nao tem conta
+       (foto de comprovante) ou esta num cartao — ai sim pode ser a
+       mesma compra chegando por dois caminhos. */
+    const contaL = l.contaId || "", contaN = novo.contaId || "";
+    const doisNoBanco = !!contaL && !!contaN && !l.cartaoId && !novo.cartaoId;
+    if (doisNoBanco && contaL !== contaN) continue;
+
     // identificador unico do banco (OFX): casamento certo, sem duvida
     const fitidIgual = !!(l.origemRef && novo.origemRef && l.origemRef.fitid &&
                           l.origemRef.fitid === novo.origemRef.fitid);
     const hashIgual = !!(l.origemRef && novo.origemRef && l.origemRef.hash &&
                          l.origemRef.hash === novo.origemRef.hash);
+
+    /* O banco numera cada movimento. Se os dois lados vieram do OFX da
+       MESMA conta com FITID diferente, o proprio banco esta dizendo que
+       sao dois movimentos distintos. Nao ha o que confirmar. */
+    const doisFitids = !!(l.origemRef && novo.origemRef && l.origemRef.fitid && novo.origemRef.fitid);
+    if (doisFitids && !fitidIgual && contaL === contaN) continue;
 
     const estL = normalizarTexto(l.estabelecimento || l.descricao || "");
     const textoBate = !!estNovo && !!estL &&
@@ -1764,8 +1812,17 @@ function completarExtrato(arq, nomeArquivo) {
   const linhas = arq.linhas || [];
   const datas = linhas.map(l => l.data).filter(Boolean).sort();
   const soma = linhas.reduce((s, l) => s + (Number(l.valor) || 0), 0);
-  const ini = arq.ini || (datas.length ? datas[0] : "");
-  const fim = arq.fim || (datas.length ? datas[datas.length - 1] : "");
+  /* O periodo declarado no cabecalho nao manda sozinho. O C6, por
+     exemplo, escreve em DTSTART/DTEND a HORA DA EXPORTACAO: um arquivo
+     de oito meses sairia como se fosse de um unico dia, e a conferencia
+     dia a dia — que corta os saldos fora do periodo — nao teria o que
+     conferir. O periodo tem de cobrir, no minimo, o que esta dentro. */
+  const primeira = datas.length ? datas[0] : "";
+  const ultima   = datas.length ? datas[datas.length - 1] : "";
+  let ini = arq.ini || primeira;
+  let fim = arq.fim || ultima;
+  if (primeira && primeira < ini) ini = primeira;
+  if (ultima   && ultima  > fim)  fim = ultima;
   let saldoIni = null, saldoIniDeduzido = false;
   if (arq.saldoFim != null) {
     // O extrato quase nunca declara o saldo de abertura; deduzir dele
@@ -1829,7 +1886,26 @@ function lerExtrato(nomeArquivo, texto) {
    mostra a categoria escolhida em cada linha e da para trocar.
 =========================================================== */
 const PALPITES_EXTRATO = [
-  [/posto|ipiranga|shell|petrobr|ale combust|texaco/, "combustivel"],
+  /* Conta PJ: o extrato do frete fala outra lingua. "CTE 17250-17327"
+     e o conhecimento de transporte faturado; "TIT DEB 51109" e o titulo
+     compensado. Sem estas duas linhas, 39 entradas de R$ 3.000 a
+     R$ 30.000 apareciam como "Extras". */
+  [/^cte\b|\bcte ?\d|tit deb|conhecimento de transporte|\bfrete/, "frete"],
+  [/pneu|embreagem|auto pecas|autopecas|empauto|retifica|oficina|funilaria|mecanic|revisao|amortecedor|balanceament|alinhament/, "manutencao"],
+  [/das\b|das ?\w{3}\d{2}|simples nacional|tributos federais|darf|sefaz|inss|fgts|dae\b|gps\b|municipio de|prefeitura de/, "imposto"],
+  [/contab|contabil|assessoria empr|fiscco|monitoramento eletronico|orsegups|alarme/, "contas"],
+  /* Pedagio e tag: no extrato de quem roda estrada isto e a linha
+     que mais se repete — 126 das 380 linhas do primeiro extrato. */
+  [/arteris|autopista|via costeira|litoral sul|pedagio|c6tag|sem parar|conectcar|veloe|autopass|ccr\b|concer|ecorodovias/, "transporte"],
+  /* Custo de banco: juros, IOF, multa, tarifa, cheque especial.
+     Sem isto tudo cai em "Outros" e o grafico nao diz nada. */
+  [/cheque especial|ch especial|excesso limite|excesso lim|limite da conta|juros atraso|juros limite|multa atraso|multa exc|adiantamento a depositante|reclassif sdo|encargo|tarifa|cesta de servi|anuidade|juros de mora|iof/, "juros"],
+  [/seguradora|pottencial|bradesco seguros|porto seguro|sulamerica|allianz|tokio marine|seguro automovel|seguro auto/, "seguro"],
+  [/loja simbolica|loja maconica|augusta e respeitavel|dizimo|oferta|doacao/, "doacao"],
+  [/limpeza urbana|saneamento|ambiental limpeza|agua e esgoto/, "contas"],
+  [/casa dos imoveis|imovei|imobiliar|aluguel|condomin/, "casa"],
+  [/sefaz|dare\b|darf|simples nacional|receita federal|prefeitura|inss|fgts/, "imposto"],
+  [/\bposto|ipiranga|shell|petrobr|ale combust|texaco|diesel/, "combustivel"],
   [/supermerc|atacad|assai|carrefour|angeloni|bistek|giassi|komprao|hipper|big\b|makro|sams club|hortifr|acougue|padaria/, "mercado"],
   [/ifood|rappi|mc ?donald|burger|subway|pizza|restaurant|lanchonet|churrasc|cafeteria|starbucks|habib/, "restaurante"],
   [/netflix|spotify|disney|hbo|max\b|prime video|deezer|globoplay|cinema|steam|playstation|xbox/, "lazer"],
@@ -1859,6 +1935,20 @@ function iconePelaDescricao(txt) {
   return null;
 }
 
+/* O palpite acerta o ASSUNTO, mas a lista de categorias de quem usa o
+   app e menor que a lista de assuntos. A conta da Vivo era reconhecida
+   como "telefone" e caia em "Outros" so porque nao existe categoria
+   "Telefone" — existe "Contas fixas", que e onde ela deveria estar.
+   Aqui esta o parentesco: se o assunto exato nao tem categoria, tenta o
+   vizinho mais proximo antes de desistir. */
+const ICONE_VIZINHO = {
+  telefone: "contas", internet: "contas", academia: "saude",
+  viagem: "lazer", presente: "lazer", manutencao: "transporte",
+  frete: "extras", empresa: "extras", prolabore: "salario",
+  investimento: "outros", doacao: "outros", seguro: "contas",
+  juros: "outros", imposto: "contas"
+};
+
 function adivinharCategoria(descricao, tipo, categorias) {
   const doTipo = (categorias || []).filter(c => (c.tipo || "despesa") === tipo && c.ativa !== false);
   if (!doTipo.length) return "";
@@ -1866,6 +1956,11 @@ function adivinharCategoria(descricao, tipo, categorias) {
   if (id) {
     const achou = doTipo.filter(c => c.icone === id)[0];
     if (achou) return achou.id;
+    const vizinho = ICONE_VIZINHO[id];
+    if (vizinho) {
+      const perto = doTipo.filter(c => c.icone === vizinho)[0];
+      if (perto) return perto.id;
+    }
   }
   const padrao = doTipo.filter(c => /^(outros|extras)$/.test(normalizarTexto(c.nome)))[0];
   return padrao ? padrao.id : "";
@@ -2058,7 +2153,7 @@ function classificarPdf(linhas) {
   const tudo = linhas.slice(0, 60).map(l => l.texto).join(" \n ");
   if (/Demonstrativo de Evolu[çc][ãa]o da D[íi]vida/i.test(tudo)) return "divida";
   if (/extrato conta|extrato\s*\/\s*lan[çc]amentos|per[íi]odo de visualiza[çc][ãa]o/i.test(tudo)) return "extrato";
-  if (/fatura|vencimento da fatura|limite total do cart[ãa]o/i.test(tudo)) return "fatura";
+  if (/Valor da fatura|Melhor dia de compra|Transa[çc][õo]es do cart[ãa]o|vencimento da fatura/i.test(tudo)) return "fatura";
   if (/Condi[çc][õo]es Gerais|Cl[áa]usula|CONTRATANTE/i.test(tudo)) return "condicoes";
   return "desconhecido";
 }
@@ -2240,7 +2335,103 @@ async function lerPdf(nomeArquivo, buffer, lib) {
   const tipo = classificarPdf(linhas);
   if (tipo === "divida")  return Object.assign(lerDemonstrativoDivida(linhas), { nome: nomeArquivo, tipo: "divida" });
   if (tipo === "extrato") return completarExtrato(lerExtratoPdf(linhas), nomeArquivo);
+  if (tipo === "fatura")  return Object.assign(lerFaturaCartao(linhas), { nome: nomeArquivo });
   return { tipo: tipo, nome: nomeArquivo, linhas: [], texto: linhas.slice(0, 40).map(l => l.texto).join("\n") };
+}
+
+/* ===========================================================
+   FATURA DE CARTAO EM PDF
+   A fatura nao e extrato: cada linha e uma COMPRA, o valor vem
+   positivo (e gasto), e a data vem sem ano — "02 nov". O ano sai
+   da data de fechamento que a propria fatura declara ("serao
+   lancadas apenas transacoes feitas ate 02/01/26").
+   Uma fatura pode ter VARIOS cartoes dentro (titular, virtual,
+   adicional), cada um com o seu subtotal.
+=========================================================== */
+const MESES_CURTOS = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const MESES_LONGOS = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+
+function mesPeloNome(txt) {
+  const n = normalizarTexto(txt).slice(0, 3);
+  const i = MESES_CURTOS.indexOf(n);
+  return i >= 0 ? i + 1 : 0;
+}
+
+function lerFaturaCartao(linhas) {
+  const texto = linhas.map(l => l.texto).join(" \n ");
+
+  // fechamento: a fatura diz ate quando aceitou lancamento
+  let fechamento = "";
+  const mFech = texto.match(/transa[çc][õo]es feitas at[ée]\s*(\d{2})\/(\d{2})\/(\d{2,4})/i);
+  if (mFech) {
+    const ano = mFech[3].length === 2 ? "20" + mFech[3] : mFech[3];
+    fechamento = ano + "-" + mFech[2] + "-" + mFech[1];
+  }
+  const mVenc = texto.match(/Vencimento:?\s*(\d{1,2})\s*de\s*([A-Za-zÀ-ú]+)/i);
+  const diaVenc = mVenc ? Number(mVenc[1]) : 0;
+  const mesVencNome = mVenc ? mVenc[2] : "";
+  const valorFatura = numeroSolto((texto.match(/Valor da fatura:?\s*R\$\s*([\d.,]+)/i) || [])[1]);
+  const melhorDia = Number((texto.match(/Melhor dia de compra:?\s*(\d{1,2})/i) || [])[1]) || 0;
+  const emissor = /C6 ?Bank|C6 Carbon|BANCO C6/i.test(texto) ? "C6" : "";
+
+  const anoFech = fechamento ? Number(fechamento.slice(0, 4)) : new Date().getFullYear();
+  const mesFech = fechamento ? Number(fechamento.slice(5, 7)) : 0;
+
+  const compras = [];
+  let cartaoAtual = "";
+  linhas.forEach(l => {
+    // cabecalho de cada cartao dentro da fatura
+    const mCartao = l.texto.match(/(.+?Final\s+\d{4}[^|]*?)\s+(?:Cart[ãa]o Virtual\s+)?Subtotal deste cart[ãa]o/i);
+    if (mCartao) { cartaoAtual = mCartao[1].replace(/\s+-\s+[A-Z ]+$/, "").trim(); return; }
+
+    const cels = l.itens;
+    if (cels.length < 2) return;
+    const mData = cels[0].texto.match(/^(\d{1,2})\s+([a-zç]{3})$/i);
+    if (!mData) return;
+    const mes = mesPeloNome(mData[2]);
+    if (!mes) return;
+    const ultimo = cels[cels.length - 1];
+    const valor = numeroSolto(ultimo.texto);
+    if (valor == null) return;
+
+    // ano: mes maior que o do fechamento e do ano anterior
+    const ano = (mesFech && mes > mesFech) ? anoFech - 1 : anoFech;
+    const data = ano + "-" + String(mes).padStart(2, "0") + "-" + String(Number(mData[1])).padStart(2, "0");
+
+    const meio = cels.slice(1, cels.length - 1).map(c => c.texto).join(" ");
+    const mParc = meio.match(/-\s*Parcela\s*(\d{1,2})\s*\/\s*(\d{1,2})/i);
+    const estorno = /-\s*Estorno/i.test(meio);
+    const descricao = meio.replace(/-\s*Parcela\s*\d{1,2}\s*\/\s*\d{1,2}/i, "").replace(/-\s*Estorno/i, "").replace(/\s+/g, " ").trim();
+    if (!descricao) return;
+
+    compras.push({
+      ordem: compras.length, data: data,
+      // estorno e credito na fatura: entra com sinal contrario
+      valor: estorno ? -Math.abs(valor) : Math.abs(valor),
+      descricao: descricao, fitid: "",
+      cartaoNaFatura: cartaoAtual,
+      parcela: mParc ? Number(mParc[1]) : 0,
+      parcelasTotal: mParc ? Number(mParc[2]) : 0,
+      estorno: estorno
+    });
+  });
+
+  const soma = compras.reduce((s, c) => s + c.valor, 0);
+  return {
+    tipo: "fatura", formato: "PDF", emissor: emissor,
+    compras: compras, linhas: compras,
+    fechamento: fechamento, diaFechamento: fechamento ? Number(fechamento.slice(8, 10)) : 0,
+    diaVencimento: diaVenc, mesVencimento: mesVencNome,
+    melhorDiaCompra: melhorDia,
+    valorFatura: valorFatura,
+    somaCompras: Math.round(soma * 100) / 100,
+    quantas: compras.length,
+    /* Conferencia da propria fatura: a soma das compras tem que dar o
+       valor da fatura. Quando nao da, faltou linha na leitura (ou a
+       fatura traz encargo que nao e compra) — e o app avisa. */
+    conferido: valorFatura != null && Math.abs(soma - valorFatura) < 0.02,
+    diferenca: valorFatura != null ? Math.round((soma - valorFatura) * 100) / 100 : null
+  };
 }
 
 
@@ -3285,6 +3476,41 @@ function AbaResumo({ dados, mes, onMes }) {
         <StatCard label="No cartão" valor={currency(noCartao)} icone={IconCard} />
       </div>
 
+      {(() => {
+        /* O compromisso fixo do mes nao e lancamento: e o que ja esta
+           combinado antes de o mes comecar. Fica separado do que
+           realmente saiu, para nao somar duas vezes. */
+        const fixas = (dados.recorrentes || []).filter(r => r.ativo !== false)
+          .filter(r => filtro === "TUDO" || (r.titularidade || "PF") === filtro);
+        if (!fixas.length) return null;
+        const grupos = [];
+        fixas.forEach(r => { if (grupos.indexOf(r.grupo || "—") < 0) grupos.push(r.grupo || "—"); });
+        const total = fixas.reduce((s, r) => s + (Number(r.valor) || 0), 0);
+        return (
+          <Cartao className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <IconList size={15} style={{ color: "var(--acento-vivo)" }} />
+              <h3 className="text-sm font-bold">Contas fixas do mês</h3>
+              <span className="ml-auto text-sm font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(total)}</span>
+            </div>
+            <div className="grade-form-2">
+              {grupos.map(g => {
+                const soma = fixas.filter(r => (r.grupo || "—") === g).reduce((s, r) => s + (Number(r.valor) || 0), 0);
+                return (
+                  <div key={g} className="flex items-baseline justify-between gap-2 py-1" style={{ borderTop: "1px solid var(--linha)" }}>
+                    <span className="text-[13px]">{g}</span>
+                    <span className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(soma)}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-[11px] mt-2" style={{ color: "var(--suave)" }}>
+              compromisso combinado, não o que já saiu — cadastro em Ajustes → Contas fixas
+            </div>
+          </Cartao>
+        );
+      })()}
+
       <Cartao className="p-4">
         <div className="flex items-center gap-2 mb-3">
           <IconTag size={15} style={{ color: "var(--acento-vivo)" }} />
@@ -4124,6 +4350,15 @@ function AbaContratos({ dados, alterar, dadosProntos }) {
               {r.proxima ? " · próxima em " + dataCurta(r.proxima.vencimento) + " de " + currency(r.proxima.valor) : " · quitado"}
             </div>
             {r.vencidas ? <div className="mt-2"><Faixa tom="erro">{r.vencidas} parcela(s) vencida(s) sem baixa.</Faixa></div> : null}
+            {c.tabelaProvisoria ? (
+              <div className="mt-2">
+                <Faixa tom="aviso">
+                  Tabela <b>provisória</b>: recalculada pela Price a partir de valor, prazo e taxa, porque ainda não
+                  chegou o documento do banco. Serve para enxergar, não para conferir centavo.
+                  {c.nota ? " " + c.nota : ""}
+                </Faixa>
+              </div>
+            ) : null}
           </Cartao>
         );
       })}
@@ -4814,6 +5049,8 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
   const novaCategoria = () => ({ id: uid(), nome: "", tipo: "despesa", icone: "outros",
     cor: CORES_CAT[Math.floor(Math.random() * CORES_CAT.length)], repetitiva: false, ativa: true });
   const novaAplicacao = () => ({ id: uid(), nome: "", banco: "", titularidade: "PF", tipo: "CDB", contaId: "", historico: [] });
+  const novaFixa = () => ({ id: uid(), grupo: "", nome: "", valor: 0, tipo: "despesa", categoria: "",
+    titularidade: "PF", contaId: "", diaVencimento: 0, ativo: true, origem: "manual" });
 
   const mudarLista = (chave, id, campo, valor) =>
     alterar(d => Object.assign({}, d, {
@@ -5082,6 +5319,59 @@ function AbaConfig({ dados, alterar, statusCarga, statusSalvar, erroCarga, recar
           ))}
           <Botao tom="neutro" onClick={() => addLista("aplicacoes", novaAplicacao())}><IconPlus size={15} /> Adicionar aplicação</Botao>
         </div>
+      </Secao>
+
+      <Secao titulo="Contas fixas" icone={IconList}
+             sub="O que se repete todo mês, agrupado como você agrupa (SFS, IBT, GVGS). O total aparece no Resumo. Não é lançamento — é o combinado do mês.">
+        {(() => {
+          const lista = dados.recorrentes || [];
+          const grupos = [];
+          lista.forEach(r => { if (grupos.indexOf(r.grupo || "—") < 0) grupos.push(r.grupo || "—"); });
+          const total = lista.filter(r => r.ativo !== false).reduce((s, r) => s + (Number(r.valor) || 0), 0);
+          return (
+            <div className="space-y-3">
+              {!lista.length ? <Vazio texto="Nenhuma conta fixa cadastrada." /> : grupos.map(g => {
+                const doGrupo = lista.filter(r => (r.grupo || "—") === g);
+                const soma = doGrupo.filter(r => r.ativo !== false).reduce((s, r) => s + (Number(r.valor) || 0), 0);
+                return (
+                  <Cartao key={g} className="p-3">
+                    <div className="flex items-baseline justify-between gap-2 mb-2">
+                      <span className="text-[13px] font-bold">{g}</span>
+                      <span className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{currency(soma)}</span>
+                    </div>
+                    {doGrupo.map(r => (
+                      <div key={r.id} className="grade-form-2 py-1.5" style={{ borderTop: "1px solid var(--linha)" }}>
+                        <Campo label="Item"><Entrada value={r.nome || ""} onChange={(e) => mudarLista("recorrentes", r.id, "nome", e.target.value)} /></Campo>
+                        <Campo label="Valor por mês">
+                          <Entrada inputMode="decimal" value={String(r.valor == null ? "" : r.valor)}
+                                   onChange={(e) => mudarLista("recorrentes", r.id, "valor", paraNumero(e.target.value))} />
+                        </Campo>
+                        <Campo label="Categoria">
+                          <Selecao value={r.categoria || ""} onChange={(e) => mudarLista("recorrentes", r.id, "categoria", e.target.value)}>
+                            <option value="">Sem categoria</option>
+                            {(dados.categorias || []).filter(c => (c.tipo || "despesa") === "despesa").map(c => (
+                              <option key={c.id} value={c.id}>{c.nome}</option>
+                            ))}
+                          </Selecao>
+                        </Campo>
+                        <div className="flex items-end gap-2">
+                          <div className="flex-1"><Campo label="Grupo"><Entrada value={r.grupo || ""} onChange={(e) => mudarLista("recorrentes", r.id, "grupo", e.target.value)} /></Campo></div>
+                          <Botao tom="perigo" onClick={() => delLista("recorrentes", r.id)} titulo="Remover"><IconTrash size={15} /></Botao>
+                        </div>
+                      </div>
+                    ))}
+                  </Cartao>
+                );
+              })}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Botao tom="neutro" onClick={() => addLista("recorrentes", novaFixa())}><IconPlus size={15} /> Nova conta fixa</Botao>
+                <span className="ml-auto text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  total por mês {currency(total)}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
       </Secao>
 
       <Secao titulo="Categorias" icone={IconTag}
