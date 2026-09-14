@@ -172,7 +172,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
    Painel de Bordo: carregador + app.html, auto-atualizacao,
    Dropbox por PKCE e leitura de documento por IA.
 =========================================================== */
-const APP_VERSION = "v16";
+const APP_VERSION = "v18";
 const NOME_APP = "Prumo";
 
 /* ===========================================================
@@ -942,6 +942,7 @@ function envelopeVazio() {
     coberturas: [],  // que pedaco de extrato de cada conta ja entrou
     categorias: categoriasIniciais(),
     recorrentes: [],
+    pendencias: [],
     config: { apiKey: "", nome: "" },
     salvoEm: null
   };
@@ -972,6 +973,13 @@ function normalizarEnvelope(bruto) {
       : Object.assign({}, c, { parcelas: gerarParcelas(c, []).parcelas })),
     aplicacoes: arr(bruto.aplicacoes),
     coberturas: arr(bruto.coberturas),
+    /* PENDENCIAS = contas a pagar que ainda nao aconteceram no extrato.
+       Nasceram na v18 porque faltava onde por o obvio: a parcela do
+       advogado que ele nao pagou, a nota do remedio, o pix que o banco
+       nao deixou devolver. Nao sao lancamento (nao sairam de conta
+       nenhuma) e nao sao contrato (nao tem tabela). Ficavam fora do
+       app inteiro — e eram justamente o que ele precisava lembrar. */
+    pendencias: arr(bruto.pendencias),
     /* Categoria sem desenho (arquivo de antes da v4) ganha um pelo
        nome — ninguem precisa sair escolhendo icone de 18 categorias. */
     categorias: (arr(bruto.categorias).length ? arr(bruto.categorias) : base.categorias)
@@ -1531,6 +1539,185 @@ function mesFaturaAberta(cartao) {
    no cartao" que interessa no dia a dia. */
 function totalFaturasAbertas(cartoes, lancamentos) {
   return (cartoes || []).reduce((s, k) => s + faturaDoCartao(k, lancamentos, mesFaturaAberta(k)).total, 0);
+}
+
+/* ===========================================================
+   QUADRO POR BANCO — v17
+   A pergunta que nenhuma tela respondia: "quanto eu devo, por
+   banco, somando tudo?". A divida de um banco nao mora num lugar
+   so — esta no cheque especial usado, na fatura aberta do cartao e
+   no saldo devedor dos contratos. Ver as tres colunas lado a lado,
+   com o total embaixo, e o que permite decidir por onde comecar.
+=========================================================== */
+function quadroPorBanco(dados, filtro) {
+  const cabe = (t) => !filtro || filtro === "TUDO" || (t || "PF") === filtro;
+  const linhas = {};
+  const pega = (banco, titular) => {
+    const nome = String(banco || "").trim() || "Sem banco";
+    const chave = nome + " · " + (titular || "PF");
+    if (!linhas[chave]) linhas[chave] = {
+      chave: chave, banco: nome, titularidade: titular || "PF",
+      emConta: 0, limite: 0, limiteUsado: 0, faturaAberta: 0,
+      limiteCartao: 0, contratos: 0, qtdContratos: 0, contas: [], cartoes: []
+    };
+    return linhas[chave];
+  };
+
+  (dados.contas || []).filter(c => cabe(c.titularidade)).forEach(c => {
+    const L = pega(c.banco, c.titularidade);
+    L.emConta += saldoDaConta(c, dados.lancamentos);
+    const u = usoDoLimite(c, dados.lancamentos);
+    L.limite += Number(c.limiteCredito) || 0;
+    L.limiteUsado += u.usado;
+    L.contas.push(c);
+  });
+  (dados.cartoes || []).filter(c => cabe(c.titularidade)).forEach(k => {
+    const L = pega(k.banco, k.titularidade);
+    L.faturaAberta += faturaDoCartao(k, dados.lancamentos, mesFaturaAberta(k)).total;
+    L.limiteCartao += Number(k.limite) || 0;
+    L.cartoes.push(k);
+  });
+  (dados.contratos || []).filter(c => cabe(c.titularidade)).forEach(c => {
+    const L = pega(c.banco, c.titularidade);
+    L.contratos += resumoContrato(c).saldoDevedor;
+    L.qtdContratos += 1;
+  });
+
+  const lista = Object.keys(linhas).map(k => linhas[k]);
+  lista.forEach(L => {
+    /* Divida do banco = o que ja foi gasto e ainda nao foi pago.
+       Cheque especial usado E divida, embora o app mostre o saldo
+       negativo em "em conta" — por isso o total NAO soma os dois:
+       o limite usado ja esta dentro do saldo negativo. */
+    L.divida = L.limiteUsado + L.faturaAberta + L.contratos;
+    L.saldoPositivo = L.emConta > 0 ? L.emConta : 0;
+    L.liquido = L.emConta - L.faturaAberta - L.contratos;
+  });
+  lista.sort((a, b) => (b.divida - a.divida) || a.banco.localeCompare(b.banco));
+
+  const soma = (campo) => lista.reduce((s, L) => s + L[campo], 0);
+  return {
+    linhas: lista,
+    total: {
+      emConta: soma("emConta"), limite: soma("limite"), limiteUsado: soma("limiteUsado"),
+      faturaAberta: soma("faturaAberta"), limiteCartao: soma("limiteCartao"),
+      contratos: soma("contratos"), divida: soma("divida"), liquido: soma("liquido"),
+      qtdContratos: soma("qtdContratos")
+    }
+  };
+}
+
+/* ===========================================================
+   COBERTURA SEMANAL — v17
+   O combinado: no domingo entram os extratos da semana que passou.
+   Entao a pergunta certa nao e "ate que dia tem extrato", e sim
+   "quais semanas estao faltando". A semana aqui vai de SEGUNDA a
+   DOMINGO, que e como a semana e contada no Brasil.
+=========================================================== */
+function segundaDaSemana(iso) {
+  const d = new Date(iso + "T12:00:00");
+  const dia = d.getDay();                    // 0=domingo
+  const recuo = dia === 0 ? 6 : dia - 1;     // domingo pertence a semana que comecou na segunda
+  d.setDate(d.getDate() - recuo);
+  return d.toISOString().slice(0, 10);
+}
+function somarDias(iso, n) {
+  const d = new Date(iso + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function rotuloSemana(ini) {
+  return dataCurta(ini) + " a " + dataCurta(somarDias(ini, 6));
+}
+
+/* Semanas de `de` ate `ate`, da mais nova para a mais velha. */
+function semanasEntre(de, ate) {
+  const out = [];
+  let s = segundaDaSemana(ate);
+  const limite = segundaDaSemana(de);
+  let guarda = 0;
+  while (s >= limite && guarda++ < 400) { out.push(s); s = somarDias(s, -7); }
+  return out;
+}
+
+/* Para UMA conta: quais semanas ja tem extrato e quais nao tem.
+   Uma semana so conta como coberta se a cobertura do extrato alcanca
+   o ULTIMO dia dela (ou o dia de hoje, na semana corrente) — extrato
+   que para no meio da semana deixa a semana em aberto. */
+function semanasDaConta(contaId, coberturas, ate, semanas) {
+  const cob = (coberturas || []).filter(c => c.contaId === contaId);
+  const hoje = ate || dataHojeISO();
+  return (semanas || []).map(ini => {
+    const fimSemana = somarDias(ini, 6);
+    const alvo = fimSemana > hoje ? hoje : fimSemana;
+    const cobre = cob.some(c => c.ini <= ini && c.fim >= alvo);
+    const parcial = !cobre && cob.some(c => c.fim >= ini && c.ini <= alvo);
+    return { ini: ini, fim: fimSemana, rotulo: rotuloSemana(ini),
+             estado: cobre ? "ok" : parcial ? "parcial" : "falta" };
+  });
+}
+
+/* ===========================================================
+   CONTAS FIXAS — v17
+   Algumas acabam (o financiamento da carreta tem ultima parcela), e
+   apagar nao serve: o mes passado continua tendo aquela despesa. Por
+   isso "encerrar" grava uma data de fim e a conta some do mes
+   seguinte, sem mexer no historico.
+=========================================================== */
+function fixaAtivaNoMes(r, mesISO) {
+  if (r.ativo === false) return false;
+  const ini = String(r.inicio || "").slice(0, 7);
+  const fim = String(r.fim || "").slice(0, 7);
+  if (ini && mesISO < ini) return false;
+  if (fim && mesISO > fim) return false;
+  return true;
+}
+
+/* Onde esta conta fixa e paga, segundo o que ele preencheu. */
+function formaDaFixa(r, dados) {
+  if (r.cartaoId) {
+    const k = (dados.cartoes || []).filter(c => c.id === r.cartaoId)[0];
+    return { tipo: "cartao", rotulo: k ? ("Cartão " + (k.banco || "") + " · " + (k.nome || "")) : "Cartão (não encontrado)", banco: k ? k.banco : "" };
+  }
+  if (r.contaId) {
+    const c = (dados.contas || []).filter(x => x.id === r.contaId)[0];
+    return { tipo: "conta", rotulo: c ? ("Débito em conta · " + (c.banco || "") + " " + (c.nome || "")) : "Conta (não encontrada)", banco: c ? c.banco : "" };
+  }
+  return { tipo: "", rotulo: "", banco: "" };
+}
+
+/* PROVA, nao palpite: procura no que ja foi importado pagamentos com
+   a cara desta conta fixa, para ele CONFIRMAR onde ela e debitada em
+   vez de ter que lembrar. O app nunca preenche sozinho — sugere. */
+function ondeVemSendoPaga(r, dados) {
+  const alvo = normalizarTexto(r.nome || "");
+  if (!alvo || alvo.length < 4) return [];
+  const valor = Number(r.valor) || 0;
+  const achados = {};
+  (dados.lancamentos || []).forEach(l => {
+    if ((l.tipo || "despesa") !== "despesa") return;
+    const texto = normalizarTexto((l.estabelecimento || "") + " " + (l.descricao || ""));
+    const bateNome = texto.indexOf(alvo) >= 0;
+    const bateValor = valor > 0 && Math.abs(l.valor - valor) <= Math.max(2, valor * 0.15);
+    if (!bateNome && !bateValor) return;
+    if (!bateNome && !l.contaId && !l.cartaoId) return;
+    const chave = l.cartaoId ? "k:" + l.cartaoId : "c:" + l.contaId;
+    if (!chave || chave === "c:") return;
+    const a = achados[chave] || (achados[chave] = { chave: chave, cartaoId: l.cartaoId || "", contaId: l.contaId || "", quantos: 0, soma: 0, forte: 0 });
+    a.quantos++; a.soma += l.valor;
+    if (bateNome && bateValor) a.forte++;
+  });
+  return Object.keys(achados).map(k => achados[k])
+    .map(a => {
+      const k = a.cartaoId ? (dados.cartoes || []).filter(x => x.id === a.cartaoId)[0] : null;
+      const c = a.contaId ? (dados.contas || []).filter(x => x.id === a.contaId)[0] : null;
+      return Object.assign(a, {
+        rotulo: k ? ("cartão " + (k.banco || "")) : c ? ((c.banco || "") + " " + (c.nome || "")) : "?",
+        media: a.quantos ? a.soma / a.quantos : 0
+      });
+    })
+    .sort((a, b) => (b.forte - a.forte) || (b.quantos - a.quantos))
+    .slice(0, 3);
 }
 
 
@@ -3376,6 +3563,587 @@ function ModalImportarContrato({ dados, alterar, dadosProntos, onClose }) {
 
 
 /* ===========================================================
+   CONTAS A PAGAR — as pendências          (entrou na v18)
+
+   Faltava um lugar para o óbvio. A parcela do advogado que ele não
+   pagou não é lançamento: não saiu de conta nenhuma, então não está
+   em extrato algum. Também não é contrato: não tem tabela, não tem
+   taxa. Antes da v18 essas coisas simplesmente não cabiam no app —
+   e eram exatamente o que precisava ser lembrado.
+
+   Três estados: em aberto, paga, cancelada. Pagar não apaga: o
+   registro fica, com a data, porque "quando foi que eu paguei
+   aquilo" é a pergunta que aparece depois.
+=========================================================== */
+
+function situacaoPendencia(p, hoje) {
+  if (p.situacao === "paga") return { id: "paga", rotulo: "paga", tom: "ok" };
+  if (p.situacao === "cancelada") return { id: "cancelada", rotulo: "cancelada", tom: "neutro" };
+  const d = hoje || dataHojeISO();
+  if (p.vencimento && p.vencimento < d) return { id: "vencida", rotulo: "vencida", tom: "perigo" };
+  return { id: "aberta", rotulo: "em aberto", tom: "aviso" };
+}
+
+function totalPendencias(lista, hoje) {
+  return (lista || [])
+    .filter(p => situacaoPendencia(p, hoje).id !== "paga" && situacaoPendencia(p, hoje).id !== "cancelada")
+    .reduce((s, p) => s + (Number(p.valor) || 0), 0);
+}
+
+function ModalPendencia({ inicial, dados, onSalvar, onClose }) {
+  const [p, setP] = useState(() => Object.assign({
+    id: uid(), descricao: "", quem: "", valor: 0, vencimento: dataHojeISO(),
+    titularidade: "PF", categoria: "", contaId: "", situacao: "aberta",
+    observacao: "", criadoEm: new Date().toISOString()
+  }, inicial || {}));
+  const mudar = (campo, valor) => setP(x => Object.assign({}, x, { [campo]: valor }));
+  const podeSalvar = String(p.descricao || "").trim() && (Number(p.valor) || 0) > 0;
+
+  return (
+    <Modal titulo={inicial && inicial.id ? "Conta a pagar" : "Nova conta a pagar"} onClose={onClose}>
+      <div className="space-y-3">
+        <Campo label="O que é" dica="Ex.: parcela do advogado, nota de remédio, devolução de pix">
+          <Entrada value={p.descricao} onChange={(e) => mudar("descricao", e.target.value)} autoFocus />
+        </Campo>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Campo label="Para quem"><Entrada value={p.quem} onChange={(e) => mudar("quem", e.target.value)} /></Campo>
+          </div>
+          <div style={{ width: 130 }}>
+            <Campo label="Valor">
+              <Entrada inputMode="decimal" value={p.valor === 0 ? "" : String(p.valor).replace(".", ",")}
+                       onChange={(e) => mudar("valor", paraNumero(e.target.value))} />
+            </Campo>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Campo label="Vence em">
+              <Entrada type="date" value={p.vencimento || ""} onChange={(e) => mudar("vencimento", e.target.value)} />
+            </Campo>
+          </div>
+          <div style={{ width: 120 }}>
+            <Campo label="PF ou PJ"><SeletorTitular valor={p.titularidade} onValor={(v) => mudar("titularidade", v)} /></Campo>
+          </div>
+        </div>
+        <Campo label="Categoria">
+          <Selecao value={p.categoria || ""} onChange={(e) => mudar("categoria", e.target.value)}>
+            <option value="">(sem categoria)</option>
+            {(dados.categorias || []).filter(c => (c.tipo || "despesa") === "despesa" && c.ativa !== false)
+              .map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </Selecao>
+        </Campo>
+        <Campo label="Observação" dica="O detalhe que você vai querer lembrar daqui a três meses.">
+          <Entrada value={p.observacao || ""} onChange={(e) => mudar("observacao", e.target.value)} />
+        </Campo>
+        <div className="flex gap-2 pt-1">
+          <Botao tom="acento" disabled={!podeSalvar} onClick={() => onSalvar(p)}>
+            <IconCheck size={15} /> Salvar
+          </Botao>
+          <Botao tom="neutro" onClick={onClose}>Cancelar</Botao>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function PainelPendencias({ dados, alterar, compacto }) {
+  const [editando, setEditando] = useState(null);
+  const hoje = dataHojeISO();
+  const lista = (dados.pendencias || []).slice().sort((a, b) => {
+    const sa = situacaoPendencia(a, hoje).id, sb = situacaoPendencia(b, hoje).id;
+    const peso = { vencida: 0, aberta: 1, paga: 2, cancelada: 3 };
+    return (peso[sa] - peso[sb]) || String(a.vencimento).localeCompare(String(b.vencimento));
+  });
+  const emAberto = totalPendencias(lista, hoje);
+  const vencidas = lista.filter(p => situacaoPendencia(p, hoje).id === "vencida");
+
+  const salvar = (p) => {
+    alterar(d => {
+      const existe = (d.pendencias || []).some(x => x.id === p.id);
+      return Object.assign({}, d, {
+        pendencias: existe ? d.pendencias.map(x => x.id === p.id ? p : x) : (d.pendencias || []).concat([p])
+      });
+    });
+    setEditando(null);
+  };
+  const mudarSituacao = (id, situacao) => alterar(d => Object.assign({}, d, {
+    pendencias: (d.pendencias || []).map(x => x.id === id
+      ? Object.assign({}, x, { situacao: situacao, pagoEm: situacao === "paga" ? hoje : "" })
+      : x)
+  }));
+  const excluir = (id) => alterar(d => Object.assign({}, d, {
+    pendencias: (d.pendencias || []).filter(x => x.id !== id)
+  }));
+
+  const CORES = { perigo: "var(--erro-claro)", aviso: "var(--ouro-escuro)", ok: "var(--ok-claro)", neutro: "var(--suave)" };
+
+  return (
+    <Cartao className="p-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <IconAlert size={15} style={{ color: "var(--acento-vivo)" }} />
+        <h3 className="text-sm font-bold flex-1">Contas a pagar</h3>
+        <span className="text-base font-bold"
+              style={{ fontFamily: "'JetBrains Mono', monospace",
+                       color: emAberto > 0 ? "var(--erro-claro)" : "var(--suave)" }}>
+          {currency(emAberto)}
+        </span>
+      </div>
+      <p className="text-[12px] mt-0.5 mb-3" style={{ color: "var(--suave)" }}>
+        O que já é devido e ainda não saiu de conta nenhuma — por isso não aparece em extrato.
+        {vencidas.length ? " " + vencidas.length + " já passou do vencimento." : ""}
+      </p>
+
+      {lista.length === 0 ? (
+        <Vazio texto="Nenhuma conta a pagar registrada." />
+      ) : (
+        <div>
+          {lista.map(p => {
+            const st = situacaoPendencia(p, hoje);
+            const paga = st.id === "paga" || st.id === "cancelada";
+            return (
+              <div key={p.id} className="py-2" style={{ borderTop: "1px solid var(--linha)", opacity: paga ? 0.55 : 1 }}>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="font-semibold text-[13px] flex-1" style={{ minWidth: 140,
+                        textDecoration: paga ? "line-through" : "none" }}>
+                    {p.descricao}
+                  </span>
+                  <span className="text-[13px] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                    {currency(p.valor)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap text-[11px] mt-0.5" style={{ color: "var(--suave)" }}>
+                  {p.quem ? <span>{p.quem}</span> : null}
+                  {p.vencimento ? <span>· vence {dataCurta(p.vencimento)}</span> : null}
+                  <span style={{ color: CORES[st.tom] }}>· {st.rotulo}</span>
+                  <ChipTitular valor={p.titularidade} />
+                </div>
+                {p.observacao ? (
+                  <div className="text-[11px] mt-0.5" style={{ color: "var(--suave)" }}>{p.observacao}</div>
+                ) : null}
+                {compacto ? null : (
+                  <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                    {st.id === "paga" ? (
+                      <Botao tom="neutro" onClick={() => mudarSituacao(p.id, "aberta")}>Reabrir</Botao>
+                    ) : (
+                      <Botao tom="neutro" onClick={() => mudarSituacao(p.id, "paga")}>
+                        <IconCheck size={14} /> Marcar paga
+                      </Botao>
+                    )}
+                    <Botao tom="neutro" onClick={() => setEditando(p)}><IconEdit size={14} /></Botao>
+                    <Botao tom="perigo" onClick={() => excluir(p.id)}><IconTrash size={14} /></Botao>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {compacto ? null : (
+        <div className="mt-3">
+          <Botao tom="neutro" onClick={() => setEditando({})}>
+            <IconPlus size={15} /> Nova conta a pagar
+          </Botao>
+        </div>
+      )}
+
+      {editando ? (
+        <ModalPendencia inicial={editando} dados={dados} onSalvar={salvar} onClose={() => setEditando(null)} />
+      ) : null}
+    </Cartao>
+  );
+}
+
+
+/* ===========================================================
+   RESUMO EM FORMATO EXTRATO — por banco           (v17)
+
+   No computador: os bancos lado a lado, em colunas, como um
+   extrato aberto ao lado do outro.
+   No celular: um banco embaixo do outro, recolhidos. Tocar no
+   banco abre os lançamentos que já foram identificados.
+
+   Uma coluna por banco só cabe numa tela larga. Em 430px de
+   largura, seis colunas viram seis tiras ilegíveis — por isso o
+   mesmo componente muda de forma, em vez de encolher.
+=========================================================== */
+
+/* Mede a largura da janela para decidir a forma. Não é CSS puro
+   porque a decisão não é só de layout: no celular cada banco é
+   um bloco que abre e fecha, e no computador todos ficam abertos. */
+function useTelaLarga(minimo) {
+  const alvo = minimo || 900;
+  const [larga, setLarga] = useState(() => {
+    try { return window.innerWidth >= alvo; } catch (e) { return false; }
+  });
+  useEffect(() => {
+    const ver = () => { try { setLarga(window.innerWidth >= alvo); } catch (e) {} };
+    window.addEventListener("resize", ver);
+    ver();
+    return () => window.removeEventListener("resize", ver);
+  }, [alvo]);
+  return larga;
+}
+
+/* Uma linha de extrato. O saldo corrente vem calculado de fora,
+   porque só faz sentido dentro da ordem daquele banco. */
+function LinhaExtrato({ l, categoria, saldo }) {
+  const entrada = (l.tipo || "despesa") === "receita";
+  return (
+    <div className="flex items-baseline gap-2 py-1.5 text-[12px]"
+         style={{ borderTop: "1px solid var(--linha)" }}>
+      <span style={{ color: "var(--suave)", width: 38, flexShrink: 0,
+                     fontFamily: "'JetBrains Mono', monospace" }}>
+        {dataCurta(l.data)}
+      </span>
+      <span className="flex-1" style={{ minWidth: 0 }}>
+        <span className="block truncate" title={l.descricao || l.estabelecimento}>
+          {l.estabelecimento || l.descricao || "(sem descrição)"}
+        </span>
+        {categoria ? (
+          <span className="inline-flex items-center gap-1" style={{ color: "var(--suave)", fontSize: 11 }}>
+            <IconeCategoria id={categoria.icone} size={11} />
+            {categoria.nome}
+          </span>
+        ) : null}
+      </span>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap",
+                     color: entrada ? "var(--ok-claro)" : "var(--texto)" }}>
+        {entrada ? "+" : "−"}{currency(l.valor).replace("R$", "").trim()}
+      </span>
+      {saldo != null ? (
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap", width: 86,
+                       textAlign: "right", fontSize: 11,
+                       color: saldo < 0 ? "var(--erro-claro)" : "var(--suave)" }}>
+          {currency(saldo).replace("R$", "").trim()}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/* O extrato de UM banco: cabeçalho com os números do banco e,
+   quando aberto, os lançamentos do mês em ordem de data. */
+function ColunaBanco({ bloco, dados, mes, aberto, onAlternar, sempreAberto, quantasLinhas }) {
+  const cat = useMemo(() => {
+    const m = {}; (dados.categorias || []).forEach(c => { m[c.id] = c; }); return m;
+  }, [dados.categorias]);
+
+  /* Lançamentos do mês que pertencem a este banco — conta OU cartão.
+     Ordem crescente para o saldo corrente fazer sentido de cima
+     para baixo, como num extrato de verdade. */
+  const linhas = useMemo(() => {
+    const idsConta = bloco.contas.map(c => c.id);
+    const idsCartao = bloco.cartoes.map(c => c.id);
+    return (dados.lancamentos || [])
+      .filter(l => mesDaData(l.data) === mes)
+      .filter(l => (l.contaId && idsConta.indexOf(l.contaId) >= 0) ||
+                   (l.cartaoId && idsCartao.indexOf(l.cartaoId) >= 0))
+      .slice()
+      .sort((a, b) => String(a.data).localeCompare(String(b.data)) || String(a.id).localeCompare(String(b.id)));
+  }, [dados.lancamentos, mes, bloco]);
+
+  const entrou = linhas.filter(l => l.tipo === "receita").reduce((s, l) => s + l.valor, 0);
+  const saiu   = linhas.filter(l => l.tipo !== "receita").reduce((s, l) => s + l.valor, 0);
+
+  /* Saldo corrente: começa no saldo da conta no fim do mês anterior
+     e vai andando. Sem isso a coluna "saldo" mentiria. */
+  const saldoFim = bloco.contas.reduce((s, c) => s + saldoDaConta(c, dados.lancamentos), 0);
+  const temConta = bloco.contas.length > 0;
+  let acumulado = null;
+  if (temConta) {
+    const depois = (dados.lancamentos || []).filter(l => {
+      const ids = bloco.contas.map(c => c.id);
+      return l.contaId && ids.indexOf(l.contaId) >= 0 && mesDaData(l.data) > mes;
+    }).reduce((s, l) => s + (l.tipo === "receita" ? l.valor : -l.valor), 0);
+    acumulado = saldoFim - depois - linhas.reduce((s, l) => s + (l.tipo === "receita" ? l.valor : -l.valor), 0);
+  }
+
+  const mostrar = sempreAberto || aberto;
+  const limite = quantasLinhas || 0;
+  const visiveis = (limite && !aberto && !sempreAberto) ? [] : linhas;
+  const corte = limite && visiveis.length > limite ? limite : visiveis.length;
+
+  return (
+    <Cartao className="p-0 overflow-hidden" style={{ display: "flex", flexDirection: "column" }}>
+      <button onClick={onAlternar}
+              className="w-full text-left px-3 py-2.5"
+              style={{ background: "transparent", border: 0, color: "var(--texto)",
+                       cursor: sempreAberto ? "default" : "pointer" }}>
+        <div className="flex items-center gap-2">
+          <IconBank size={15} style={{ color: "var(--acento-vivo)" }} />
+          <span className="text-sm font-bold flex-1">{bloco.banco}</span>
+          <ChipTitular valor={bloco.titularidade} />
+          {sempreAberto ? null : (
+            <span style={{ color: "var(--suave)", transform: mostrar ? "rotate(90deg)" : "none",
+                           display: "inline-block", transition: "transform .15s" }}>›</span>
+          )}
+        </div>
+        <div className="flex items-baseline justify-between mt-1.5">
+          <span className="text-[11px] uppercase tracking-wider" style={{ color: "var(--suave)" }}>
+            {temConta ? "saldo hoje" : "fatura aberta"}
+          </span>
+          <span className="text-base font-bold"
+                style={{ fontFamily: "'JetBrains Mono', monospace",
+                         color: (temConta ? saldoFim : -bloco.faturaAberta) < 0 ? "var(--erro-claro)" : "var(--ok-claro)" }}>
+            {currency(temConta ? saldoFim : bloco.faturaAberta)}
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between text-[11px] mt-0.5" style={{ color: "var(--suave)" }}>
+          <span>{linhas.length} lançamento{linhas.length === 1 ? "" : "s"} em {mesPorExtenso(mes)}</span>
+          <span>
+            <span style={{ color: "var(--ok-claro)" }}>+{currency(entrou).replace("R$", "").trim()}</span>
+            {"  "}
+            <span>−{currency(saiu).replace("R$", "").trim()}</span>
+          </span>
+        </div>
+        {bloco.divida > 0 ? (
+          <div className="text-[11px] mt-1" style={{ color: "var(--erro-claro)" }}>
+            dívida total no banco: {currency(bloco.divida)}
+          </div>
+        ) : null}
+      </button>
+
+      {mostrar ? (
+        <div className="px-3 pb-2" style={{ flex: 1, overflowY: "auto", maxHeight: 420 }}>
+          {linhas.length === 0 ? (
+            <div className="py-3 text-[12px]" style={{ color: "var(--suave)" }}>
+              Nenhum lançamento identificado neste mês.
+              {bloco.contas.length && !(dados.coberturas || []).some(c => bloco.contas.some(x => x.id === c.contaId))
+                ? " Este banco ainda não teve extrato importado." : ""}
+            </div>
+          ) : linhas.map((l, i) => {
+            if (temConta && (l.contaId)) acumulado += (l.tipo === "receita" ? l.valor : -l.valor);
+            return <LinhaExtrato key={l.id || i} l={l} categoria={cat[l.categoria]}
+                                 saldo={temConta && l.contaId ? acumulado : null} />;
+          })}
+        </div>
+      ) : null}
+    </Cartao>
+  );
+}
+
+function ResumoExtrato({ dados, mes, filtro }) {
+  const larga = useTelaLarga(900);
+  const [abertos, setAbertos] = useState({});
+  const q = useMemo(() => quadroPorBanco(dados, filtro), [dados, filtro]);
+  if (!q.linhas.length) return null;
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
+        <h3 className="text-sm font-bold">Extrato por banco · {mesPorExtenso(mes)}</h3>
+        <span className="text-[12px]" style={{ color: "var(--suave)" }}>
+          {larga ? "um banco por coluna" : "toque num banco para abrir os lançamentos"}
+        </span>
+      </div>
+
+      <div style={larga
+        ? { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            gap: 12, alignItems: "start" }
+        : { display: "flex", flexDirection: "column", gap: 10 }}>
+        {q.linhas.map(b => (
+          <ColunaBanco key={b.chave} bloco={b} dados={dados} mes={mes}
+                       sempreAberto={larga}
+                       aberto={!!abertos[b.chave]}
+                       onAlternar={() => { if (!larga) setAbertos(a => Object.assign({}, a, { [b.chave]: !a[b.chave] })); }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+/* ===========================================================
+   QUADRO POR BANCO  +  COBERTURA SEMANAL      (entrou na v17)
+
+   Duas telas que respondem as duas perguntas do domingo:
+     "quanto eu devo, por banco?"  e  "que extrato ainda falta?"
+
+   A divida de um banco nunca esta num lugar so: parte no cheque
+   especial, parte na fatura aberta do cartao, parte no saldo devedor
+   dos contratos. Enquanto elas ficam em telas diferentes, ninguem
+   consegue dizer qual banco pesa mais.
+=========================================================== */
+
+/* Numero de dinheiro em tabela: monoespacado e alinhado a direita,
+   senao a coluna nao pode ser lida de cima para baixo. */
+function Num({ valor, tom, forte }) {
+  const cor = tom === "perigo" ? "var(--erro-claro)"
+            : tom === "ok" ? "var(--ok-claro)"
+            : valor === 0 ? "var(--suave)" : "var(--texto)";
+  return (
+    <span style={{ fontFamily: "'JetBrains Mono', monospace", color: cor,
+                   fontWeight: forte ? 700 : 500, whiteSpace: "nowrap" }}>
+      {valor === 0 ? "—" : currency(valor)}
+    </span>
+  );
+}
+
+function QuadroPorBanco({ dados, filtro, aoAbrirBanco }) {
+  const q = useMemo(() => quadroPorBanco(dados, filtro), [dados, filtro]);
+  if (!q.linhas.length) return null;
+  const t = q.total;
+
+  const Cabeca = ({ children, dica }) => (
+    <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-bold"
+        title={dica} style={{ color: "var(--suave)", whiteSpace: "nowrap" }}>{children}</th>
+  );
+
+  return (
+    <Cartao className="p-0 overflow-hidden">
+      <div className="px-4 pt-3 pb-2">
+        <div className="flex items-center gap-2">
+          <IconGrid size={15} style={{ color: "var(--acento-vivo)" }} />
+          <h3 className="text-sm font-bold">Quadro por banco</h3>
+        </div>
+        <p className="text-[12px] mt-0.5" style={{ color: "var(--suave)" }}>
+          Uma linha por banco, a dívida repartida em colunas. O total geral está no rodapé.
+        </p>
+      </div>
+
+      {/* Tabela larga: no celular ela rola de lado, que e melhor do que
+          espremer seis colunas de dinheiro ate ficarem ilegiveis. */}
+      <div style={{ overflowX: "auto" }}>
+        <table className="w-full text-[13px]" style={{ borderCollapse: "collapse", minWidth: 620 }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid var(--borda)" }}>
+              <th className="px-3 py-2 text-left text-[10px] uppercase tracking-wider font-bold"
+                  style={{ color: "var(--suave)" }}>Banco</th>
+              <Cabeca dica="Saldo das contas correntes deste banco">Em conta</Cabeca>
+              <Cabeca dica="Cheque especial já consumido — isto é dívida, e já está dentro do saldo negativo">Limite usado</Cabeca>
+              <Cabeca dica="O que já entrou no ciclo atual do cartão e ainda não venceu">Fatura aberta</Cabeca>
+              <Cabeca dica="Soma do saldo devedor dos contratos deste banco">Contratos</Cabeca>
+              <Cabeca dica="Limite usado + fatura aberta + contratos">Dívida total</Cabeca>
+            </tr>
+          </thead>
+          <tbody>
+            {q.linhas.map(L => (
+              <tr key={L.chave} style={{ borderBottom: "1px solid var(--linha)", cursor: aoAbrirBanco ? "pointer" : "default" }}
+                  onClick={() => aoAbrirBanco && aoAbrirBanco(L)}>
+                <td className="px-3 py-2">
+                  <span className="font-semibold">{L.banco}</span>
+                  <ChipTitular valor={L.titularidade} />
+                  <div className="text-[11px]" style={{ color: "var(--suave)" }}>
+                    {[L.contas.length ? L.contas.length + " conta" + (L.contas.length > 1 ? "s" : "") : "",
+                      L.cartoes.length ? L.cartoes.length + " cartão" + (L.cartoes.length > 1 ? "ões" : "") : "",
+                      L.qtdContratos ? L.qtdContratos + " contrato" + (L.qtdContratos > 1 ? "s" : "") : ""
+                     ].filter(Boolean).join(" · ")}
+                  </div>
+                </td>
+                <td className="px-2 py-2 text-right"><Num valor={L.emConta} tom={L.emConta < 0 ? "perigo" : L.emConta > 0 ? "ok" : ""} /></td>
+                <td className="px-2 py-2 text-right"><Num valor={L.limiteUsado} tom={L.limiteUsado > 0 ? "perigo" : ""} /></td>
+                <td className="px-2 py-2 text-right"><Num valor={L.faturaAberta} /></td>
+                <td className="px-2 py-2 text-right"><Num valor={L.contratos} /></td>
+                <td className="px-2 py-2 text-right"><Num valor={L.divida} tom={L.divida > 0 ? "perigo" : ""} forte /></td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr style={{ borderTop: "2px solid var(--borda)", background: "var(--fundo)" }}>
+              <td className="px-3 py-2.5 font-bold">TOTAL</td>
+              <td className="px-2 py-2.5 text-right"><Num valor={t.emConta} tom={t.emConta < 0 ? "perigo" : "ok"} forte /></td>
+              <td className="px-2 py-2.5 text-right"><Num valor={t.limiteUsado} tom={t.limiteUsado > 0 ? "perigo" : ""} forte /></td>
+              <td className="px-2 py-2.5 text-right"><Num valor={t.faturaAberta} forte /></td>
+              <td className="px-2 py-2.5 text-right"><Num valor={t.contratos} forte /></td>
+              <td className="px-2 py-2.5 text-right" style={{ fontSize: 15 }}><Num valor={t.divida} tom="perigo" forte /></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div className="px-4 py-2.5 text-[12px]" style={{ borderTop: "1px solid var(--linha)", color: "var(--suave)" }}>
+        O limite usado já está dentro do saldo negativo da conta — ele aparece numa coluna própria
+        porque é dívida, mas não é somado duas vezes.
+      </div>
+    </Cartao>
+  );
+}
+
+/* ===========================================================
+   COBERTURA SEMANAL
+   O combinado é domingo: entram os extratos da semana que passou.
+   Esta tela existe para a pergunta ser respondida de relance —
+   quadradinho vazio é semana sem extrato.
+=========================================================== */
+function CoberturaSemanal({ dados, quantas }) {
+  const hoje = dataHojeISO();
+  const contas = (dados.contas || []).filter(c => c.ativa !== false);
+  const nSemanas = quantas || 8;
+  const semanas = useMemo(
+    () => semanasEntre(somarDias(hoje, -7 * (nSemanas - 1)), hoje).reverse(),
+    [hoje, nSemanas]
+  );
+
+  const linhas = contas.map(c => ({
+    conta: c,
+    semanas: semanasDaConta(c.id, dados.coberturas, hoje, semanas)
+  }));
+  const faltando = linhas.reduce((s, L) => s + L.semanas.filter(x => x.estado !== "ok").length, 0);
+
+  const COR = { ok: "var(--ok)", parcial: "var(--aviso-borda)", falta: "var(--superficie)" };
+  const BORDA = { ok: "var(--ok)", parcial: "var(--aviso-borda)", falta: "var(--borda)" };
+
+  return (
+    <Cartao className="p-4">
+      <div className="flex items-center gap-2">
+        <IconList size={15} style={{ color: "var(--acento-vivo)" }} />
+        <h3 className="text-sm font-bold">Semanas com extrato</h3>
+      </div>
+      <p className="text-[12px] mt-0.5 mb-3" style={{ color: "var(--suave)" }}>
+        As {nSemanas} últimas semanas (segunda a domingo), a mais recente à direita.
+        {faltando ? " Faltam " + faltando + " semana(s) de extrato." : " Tudo em dia."}
+      </p>
+
+      <div style={{ overflowX: "auto" }}>
+        <table className="text-[12px]" style={{ borderCollapse: "collapse", minWidth: 520 }}>
+          <thead>
+            <tr>
+              <th className="px-2 py-1 text-left text-[10px] uppercase" style={{ color: "var(--suave)" }}>Conta</th>
+              {semanas.map(s => (
+                <th key={s} className="px-1 py-1 text-[10px] font-normal" style={{ color: "var(--suave)", whiteSpace: "nowrap" }}>
+                  {dataCurta(s)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map(L => (
+              <tr key={L.conta.id} style={{ borderTop: "1px solid var(--linha)" }}>
+                <td className="px-2 py-1.5" style={{ whiteSpace: "nowrap" }}>
+                  <span className="font-semibold">{L.conta.banco}</span>
+                  <span style={{ color: "var(--suave)" }}> {L.conta.titularidade}</span>
+                </td>
+                {L.semanas.map(s => (
+                  <td key={s.ini} className="px-1 py-1.5 text-center">
+                    <span title={L.conta.banco + " · " + s.rotulo + " · " +
+                                 (s.estado === "ok" ? "extrato completo" : s.estado === "parcial" ? "extrato incompleto" : "sem extrato")}
+                          style={{ display: "inline-block", width: 18, height: 18, borderRadius: 4,
+                                   background: COR[s.estado], border: "1px solid " + BORDA[s.estado] }} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 mt-3 text-[11px]" style={{ color: "var(--suave)" }}>
+        {[["ok", "semana fechada"], ["parcial", "extrato pega só parte"], ["falta", "sem extrato"]].map(([k, r]) => (
+          <span key={k} className="inline-flex items-center gap-1.5">
+            <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 3,
+                           background: COR[k], border: "1px solid " + BORDA[k] }} />
+            {r}
+          </span>
+        ))}
+      </div>
+    </Cartao>
+  );
+}
+
+
+/* ===========================================================
    SELETOR DE MES
 =========================================================== */
 function SeletorMes({ mes, onMes }) {
@@ -3578,7 +4346,7 @@ function ModalLancamento({ inicial, dados, refLancamentos, dadosProntos, onSalva
    ABA RESUMO — quanto entrou, quanto saiu, o que sobrou,
    e a despesa por categoria comparada com o mes anterior.
 =========================================================== */
-function AbaResumo({ dados, mes, onMes }) {
+function AbaResumo({ dados, alterar, mes, onMes }) {
   const [filtro, setFiltro] = useState("TUDO");
   const catPorId = useMemo(() => {
     const m = {}; (dados.categorias || []).forEach(c => { m[c.id] = c; }); return m;
@@ -3642,6 +4410,13 @@ function AbaResumo({ dados, mes, onMes }) {
         <StatCard label="Sobrou" valor={currency(sobrou)} icone={IconWallet} tom={sobrou >= 0 ? "ok" : "perigo"} />
         <StatCard label="No cartão" valor={currency(noCartao)} icone={IconCard} />
       </div>
+
+      {/* O quadro por banco e o extrato de cada um: e daqui que sai a
+          resposta de domingo — quanto devo, onde, e o que ja entrou. */}
+      <PainelPendencias dados={dados} alterar={alterar} />
+      <QuadroPorBanco dados={dados} filtro={filtro} />
+      <ResumoExtrato dados={dados} mes={mes} filtro={filtro} />
+      <CoberturaSemanal dados={dados} quantas={8} />
 
       {(() => {
         /* O compromisso fixo do mes nao e lancamento: e o que ja esta
@@ -4517,6 +5292,19 @@ function AbaContratos({ dados, alterar, dadosProntos }) {
               {r.proxima ? " · próxima em " + dataCurta(r.proxima.vencimento) + " de " + currency(r.proxima.valor) : " · quitado"}
             </div>
             {r.vencidas ? <div className="mt-2"><Faixa tom="erro">{r.vencidas} parcela(s) vencida(s) sem baixa.</Faixa></div> : null}
+            {/* Contrato assumido mas sem documento: NAO vale mostrar como
+                quitado nem estimar parcela. Aparece pelo que e — um
+                compromisso conhecido, de valor ainda desconhecido. */}
+            {c.aguardandoContrato ? (
+              <div className="mt-2">
+                <Faixa tom="aviso">
+                  <b>Aguardando o contrato.</b> Este compromisso está registrado porque existe, mas
+                  valor, prazo, parcela e vencimentos <b>não foram estimados</b> — ficam em branco até
+                  o documento chegar. Por isso ele não entra na soma da dívida.
+                  {c.observacao ? " " + c.observacao : ""}
+                </Faixa>
+              </div>
+            ) : null}
             {c.tabelaProvisoria ? (
               <div className="mt-2">
                 <Faixa tom="aviso">
@@ -5845,7 +6633,7 @@ function App() {
           </Faixa>
         ) : null}
 
-        {aba === "resumo" ? <AbaResumo dados={dados} mes={mes} onMes={setMes} /> : null}
+        {aba === "resumo" ? <AbaResumo dados={dados} alterar={alterar} mes={mes} onMes={setMes} /> : null}
         {aba === "bancos" ? <AbaBancos dados={dados} alterar={alterar} mes={mes} dadosProntos={dadosProntos} /> : null}
         {aba === "contratos" ? <AbaContratos dados={dados} alterar={alterar} dadosProntos={dadosProntos} /> : null}
         {aba === "graficos" ? <AbaGraficos dados={dados} mes={mes} onMes={setMes} /> : null}
